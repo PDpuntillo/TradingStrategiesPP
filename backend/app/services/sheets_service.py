@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 # Timeout más alto para tolerar latencia ocasional de Google bajo carga.
 _HTTP_TIMEOUT_SECONDS = 30
 # Cuánto esperan los waiters cuando otro thread está haciendo el fetch.
-_INFLIGHT_WAIT_SECONDS = 35
+# 90s: cubre cold-start de Render free (~40-60s para levantar el dyno)
+# + el fetch real a Google (~1-2s). En local/instances always-on alcanza con
+# mucho menos, pero el costo de esperar de más es bajo y el costo de timeout
+# espurio es un 500 visible en la UI.
+_INFLIGHT_WAIT_SECONDS = 90
 
 
 class SheetsService:
