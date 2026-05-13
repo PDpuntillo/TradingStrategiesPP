@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePortfolio } from '../hooks/usePortfolio'
+import { useTickerData } from '../hooks/useTickerData'
 import { fmt } from '../lib/format'
 import styles from './PortfolioOptimizer.module.css'
 
@@ -9,15 +10,41 @@ const TICKERS = ['GGAL', 'YPF', 'PAMP']
  * PortfolioOptimizer — strategy 18, Sharpe maximization.
  * Bars horizontales, una por ticker, ancho = abs(weight).
  * Pesos negativos (cuando dollar_neutral=true) se pintan en oxblood.
+ *
+ * Inversión mínima = suma del último close de cada ticker
+ * (equivalente a 1 acción de cada uno, redondeada hacia arriba).
+ * Sin máximo. Lee los precios via useTickerData con el mismo limit
+ * que TickerLane → cache hit en el backend, no genera fetch extra.
  */
 export default function PortfolioOptimizer() {
   const { data, loading, error, optimize } = usePortfolio()
+
+  // Trae el último close de cada ticker (cache hit del backend).
+  const ggal = useTickerData('GGAL')
+  const ypf = useTickerData('YPF')
+  const pamp = useTickerData('PAMP')
+
+  // Mínimo dinámico: suma de 1 acción de cada ticker
+  const minInvestment = useMemo(() => {
+    const last = (d) => d?.bars?.[d.bars.length - 1]?.close
+    const sum =
+      (last(ggal.data) ?? 0) +
+      (last(ypf.data) ?? 0) +
+      (last(pamp.data) ?? 0)
+    return sum > 0 ? Math.ceil(sum) : null
+  }, [ggal.data, ypf.data, pamp.data])
+
+  const pricesLoading = ggal.loading || ypf.loading || pamp.loading
+
   const [lookback, setLookback] = useState(252)
   const [dollarNeutral, setDollarNeutral] = useState(false)
   const [investment, setInvestment] = useState(100000)
 
+  const investmentTooLow = minInvestment != null && investment < minInvestment
+
   const handleRun = (e) => {
     e.preventDefault()
+    if (investmentTooLow) return
     optimize({
       tickers: TICKERS,
       lookback_days: lookback,
@@ -52,13 +79,23 @@ export default function PortfolioOptimizer() {
         </div>
 
         <div className={styles.field}>
-          <label className={styles.lbl}>INVERSIÓN TOTAL</label>
+          <label className={styles.lbl}>
+            INVERSIÓN TOTAL
+            <span className={styles.bounds}>
+              {pricesLoading
+                ? '[cargando precios…]'
+                : minInvestment != null
+                  ? `[min ≥ ${fmt.price(minInvestment)} · sin máx]`
+                  : '[sin límite]'}
+            </span>
+          </label>
           <input
             type="number"
-            min={1}
-            step={1000}
+            min={minInvestment ?? 1}
+            step="any"
             value={investment}
-            onChange={(e) => setInvestment(parseFloat(e.target.value))}
+            onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
+            aria-invalid={investmentTooLow}
           />
         </div>
 
@@ -75,10 +112,20 @@ export default function PortfolioOptimizer() {
           </button>
         </div>
 
-        <button type="submit" className={styles.submit} disabled={loading}>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || pricesLoading || investmentTooLow}
+        >
           {loading ? 'OPTIMIZANDO…' : 'OPTIMIZAR'}
         </button>
       </form>
+
+      {investmentTooLow && (
+        <div className={styles.error}>
+          Inversión insuficiente. Mínimo {fmt.price(minInvestment)} (1 acción de cada ticker).
+        </div>
+      )}
 
       {error && (
         <div className={styles.error}>{String(error.message ?? error)}</div>
