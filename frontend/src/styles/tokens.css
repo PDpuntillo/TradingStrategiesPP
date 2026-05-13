@@ -1,0 +1,78 @@
+/*
+ * Design tokens — Tradingstrategys
+ * ---
+ * Aesthetic: Bloomberg-terminal heritage.
+ * Mono everywhere. Borders-only (no shadows). Ambar accent.
+ * Single hue (warm), shifts only in lightness.
+ */
+
+:root {
+  /* ===== Surfaces ===== */
+  --bg-canvas: #0A0A0A;       /* el void */
+  --bg-elev-1: #121212;       /* lane background */
+  --bg-elev-2: #1A1A1A;       /* card / dropdown / drawer */
+  --bg-elev-3: #222222;       /* hover lift sutil */
+  --bg-input:  #060606;       /* inset — más oscuro que canvas */
+
+  /* ===== Borders ===== */
+  --border-soft: rgba(255, 220, 130, 0.06);
+  --border:      rgba(255, 220, 130, 0.10);
+  --border-emph: rgba(255, 220, 130, 0.20);
+  --focus-ring:  rgba(255, 176, 0, 0.45);
+
+  /* ===== Text — 4 levels ===== */
+  --fg-primary:    #F5EFE0;   /* marfil */
+  --fg-secondary:  #A8A095;
+  --fg-tertiary:   #6B6760;
+  --fg-muted:      #3D3A36;
+
+  /* ===== Brand & semantic ===== */
+  --accent-amber: #FFB000;        /* Bloomberg amber */
+  --accent-amber-dim: #B87B00;
+  --sig-long:     #4ADE80;        /* phosphor green */
+  --sig-short:    #B03A48;        /* oxblood */
+  --sig-neutral:  #6B6760;
+
+  /* ===== Chart overlays ===== */
+  --overlay-cyan:   #5EEAD4;      /* MA1 (short) */
+  --overlay-blue:   #60A5FA;      /* MA2 (mid)   */
+  --overlay-violet: #A78BFA;      /* MA3 (long)  */
+  --overlay-grid:   rgba(255, 220, 130, 0.04);
+
+  /* ===== Spacing — base 4px ===== */
+  --s-0: 0;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-8: 48px;
+  --s-10: 64px;
+
+  /* ===== Radius (mínimo, técnico) ===== */
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 6px;
+
+  /* ===== Typography ===== */
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+
+  --fs-micro: 10px;
+  --fs-xs:    11px;
+  --fs-sm:    12px;
+  --fs-body:  13px;
+  --fs-md:    14px;
+  --fs-lg:    16px;
+  --fs-xl:    20px;
+  --fs-data:  24px;       /* hero números */
+  --fs-mega:  36px;
+
+  --tracking-tight: -0.02em;
+  --tracking-wide:  0.08em;
+
+  /* ===== Motion ===== */
+  --t-fast: 90ms;
+  --t-base: 160ms;
+  --ease:   cubic-bezier(0.2, 0.7, 0.2, 1);
+}

@@ -1,0 +1,81 @@
+/*
+ * Base styles — reset mínimo + body.
+ * Mono everywhere. Sin animaciones de spring.
+ */
+@import './tokens.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+html {
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--fg-primary);
+  background: var(--bg-canvas);
+  font-feature-settings: 'tnum' 1, 'cv02' 1, 'ss01' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Números tabulares por default — alineación por punto decimal */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+input, select {
+  font: inherit;
+  color: var(--fg-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+input:hover, select:hover {
+  border-color: var(--border-emph);
+}
+
+/* Scrollbar minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elev-3);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-amber-dim);
+}

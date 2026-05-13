@@ -165,6 +165,7 @@ class SheetsService:
             "%Y-%m-%d",
             "%d/%m/%Y %H:%M:%S",
             "%d/%m/%Y",
+            "%m/%d/%Y %H:%M:%S",   # GOOGLEFINANCE US locale: 5/13/2025 17:00:00
             "%m/%d/%Y",
         ]
         for fmt in formats:

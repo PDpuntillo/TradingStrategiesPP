@@ -1,0 +1,19 @@
+.chart {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev-1);
+  padding: var(--s-2);
+  border-right: 1px solid var(--border);
+}
+
+.empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elev-1);
+  color: var(--fg-tertiary);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  border-right: 1px solid var(--border);
+}
