@@ -5,7 +5,9 @@ Cachea resultados para minimizar requests.
 from datetime import datetime
 from typing import List, Optional
 import logging
+import threading
 
+import httplib2
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from cachetools import TTLCache
@@ -16,27 +18,42 @@ from app.models.strategy import Ticker, PriceBar, TickerData
 
 logger = logging.getLogger(__name__)
 
+# Timeout más alto para tolerar latencia ocasional de Google bajo carga.
+_HTTP_TIMEOUT_SECONDS = 30
+# Cuánto esperan los waiters cuando otro thread está haciendo el fetch.
+_INFLIGHT_WAIT_SECONDS = 35
+
 
 class SheetsService:
     """
     Cliente de Google Sheets API (solo lectura con API Key).
 
     Las spreadsheets deben estar compartidas como "Anyone with link can view".
+
+    Concurrency: si llegan N requests para la misma cache_key con la cache
+    fría, solo UNA llama a Google; las otras esperan al primer fetcher.
+    Evita el burst que satura la API y dispara TimeoutErrors.
     """
 
     def __init__(self):
         self.settings = get_settings()
+        # Http con timeout explícito (httplib2 default es muy bajo).
+        http = httplib2.Http(timeout=_HTTP_TIMEOUT_SECONDS)
         self.service = build(
             "sheets",
             "v4",
             developerKey=self.settings.google_sheets_api_key,
             cache_discovery=False,
+            http=http,
         )
         # Cache: 5 min TTL, max 100 entries
         self._cache: TTLCache = TTLCache(
             maxsize=100,
             ttl=self.settings.cache_ttl_seconds,
         )
+        # In-flight request dedup: key → Event signaled when fetch resolves
+        self._in_flight: dict[str, threading.Event] = {}
+        self._in_flight_lock = threading.Lock()
 
     def _get_spreadsheet_id(self, ticker: Ticker) -> str:
         """Resuelve el spreadsheet_id desde el ticker."""
@@ -63,13 +80,41 @@ class SheetsService:
             Lista de filas (cada fila es lista de strings)
         """
         cache_key = f"{ticker.value}:{sheet_name}:{cell_range}"
+
+        # 1. Cache hit (fast path, sin lock)
         if cache_key in self._cache:
             logger.debug(f"Cache HIT: {cache_key}")
             return self._cache[cache_key]
 
+        # 2. Coordinar con otros threads: ¿soy el fetcher o waiter?
+        with self._in_flight_lock:
+            # Double-check dentro del lock por si otro thread populó la cache
+            if cache_key in self._cache:
+                return self._cache[cache_key]
+            event = self._in_flight.get(cache_key)
+            if event is None:
+                # Soy el fetcher
+                event = threading.Event()
+                self._in_flight[cache_key] = event
+                i_am_fetcher = True
+            else:
+                # Otro thread ya está fetcheando — espero
+                i_am_fetcher = False
+
+        if not i_am_fetcher:
+            # Esperar a que el fetcher original termine
+            signaled = event.wait(timeout=_INFLIGHT_WAIT_SECONDS)
+            if signaled and cache_key in self._cache:
+                logger.debug(f"Cache COALESCED: {cache_key}")
+                return self._cache[cache_key]
+            # Timeout o el fetcher falló — propagar como error claro
+            raise TimeoutError(
+                f"Esperando fetch concurrente de {cache_key} ({_INFLIGHT_WAIT_SECONDS}s)"
+            )
+
+        # 3. Soy el fetcher: llamar a Google y notificar waiters al final
         spreadsheet_id = self._get_spreadsheet_id(ticker)
         full_range = f"{sheet_name}!{cell_range}"
-
         try:
             result = (
                 self.service.spreadsheets()
@@ -85,6 +130,12 @@ class SheetsService:
         except HttpError as e:
             logger.error(f"Error leyendo Sheets: {e}")
             raise
+
+        finally:
+            # Limpiar in-flight y notificar waiters (haya éxito o no)
+            with self._in_flight_lock:
+                self._in_flight.pop(cache_key, None)
+            event.set()
 
     def get_raw_data(self, ticker: Ticker, limit: int = 500) -> TickerData:
         """
