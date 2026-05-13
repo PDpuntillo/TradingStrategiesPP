@@ -1,0 +1,84 @@
+/* Signature: vertical 5-segment strip + consensus footer */
+.rail {
+  display: flex;
+  flex-direction: column;
+  width: 88px;
+  min-width: 88px;
+  background: var(--bg-elev-1);
+  border-right: 1px solid var(--border);
+}
+
+.segments {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.segment {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    'label dot'
+    'name  dot';
+  align-items: center;
+  padding: var(--s-2) var(--s-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  /* Barra de color a la izquierda — el “signal stripe” */
+  border-left: 3px solid var(--seg-color, var(--bg-elev-3));
+  transition: background var(--t-fast) var(--ease);
+  flex: 1;
+}
+
+.segment:hover {
+  background: var(--bg-elev-2);
+}
+
+.segLabel {
+  grid-area: label;
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+}
+
+.segName {
+  grid-area: name;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-secondary);
+  letter-spacing: var(--tracking-wide);
+}
+
+.segDot {
+  grid-area: dot;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--seg-color);
+  box-shadow: 0 0 6px var(--seg-color);
+}
+
+.consensus {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-3);
+  border-top: 1px solid var(--border);
+  border-left: 3px solid var(--seg-color);
+  background: var(--bg-elev-2);
+}
+
+.consensusLabel {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+}
+
+.consensusValue {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--seg-color);
+  letter-spacing: var(--tracking-wide);
+  margin-top: var(--s-1);
+}
