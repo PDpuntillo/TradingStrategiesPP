@@ -53,6 +53,7 @@ En la sección **Environment Variables** agregá:
 
 | Key | Value |
 |---|---|
+| `PYTHON_VERSION` | `3.11.9` ← **obligatorio**, ver nota abajo |
 | `GOOGLE_SHEETS_API_KEY` | tu API key (la que tenés en `backend/.env`) |
 | `SPREADSHEET_ID_GGAL` | el ID de la sheet GGAL |
 | `SPREADSHEET_ID_YPF` | el ID de la sheet YPF |
@@ -61,6 +62,8 @@ En la sección **Environment Variables** agregá:
 | `CACHE_TTL_SECONDS` | `300` |
 
 > ⚠️ **No pongas `PORT`** — Render lo inyecta automáticamente. El Dockerfile lo lee con `${PORT:-8000}`.
+>
+> ⚠️ **`PYTHON_VERSION=3.11.9` es crítico**: numpy/scipy/pandas en `requirements.txt` solo tienen wheels pre-compilados hasta Python 3.12. Si Render usa la última (3.13+), pip intenta compilar desde source, falla por falta de `gfortran`/`meson` y revienta el build. El `backend/.python-version` también pinea esto pero Render lee el env var primero.
 
 ### 2.4. Deploy
 1. Click **Create Web Service**
