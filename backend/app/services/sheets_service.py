@@ -69,7 +69,9 @@ class SheetsService:
 
     def _get_spreadsheet_id(self, ticker: Ticker) -> str:
         """Resuelve el spreadsheet_id desde el ticker."""
-        spreadsheet_id = self.settings.spreadsheet_ids_map.get(ticker.value)
+        # Ticker es str ahora (no Enum). Normalizar a uppercase por seguridad.
+        key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
+        spreadsheet_id = self.settings.spreadsheet_ids_map.get(key)
         if not spreadsheet_id:
             raise ValueError(f"No spreadsheet configurado para ticker: {ticker}")
         return spreadsheet_id
@@ -91,7 +93,8 @@ class SheetsService:
         Returns:
             Lista de filas (cada fila es lista de strings)
         """
-        cache_key = f"{ticker.value}:{sheet_name}:{cell_range}"
+        ticker_key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
+        cache_key = f"{ticker_key}:{sheet_name}:{cell_range}"
 
         # 1. Cache hit (fast path, sin lock)
         if cache_key in self._cache:
@@ -140,7 +143,7 @@ class SheetsService:
                 )
             values = result.get("values", [])
             self._cache[cache_key] = values
-            logger.info(f"Sheets READ: {ticker.value}/{sheet_name} ({len(values)} rows)")
+            logger.info(f"Sheets READ: {ticker_key}/{sheet_name} ({len(values)} rows)")
             return values
 
         except HttpError as e:
