@@ -1,0 +1,147 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 360px;
+  background: var(--bg-elev-2);
+  border-right: 1px solid var(--border-emph);
+  display: flex;
+  flex-direction: column;
+  z-index: 51;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  font-size: var(--fs-micro);
+  color: var(--accent-amber);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 700;
+}
+
+.title {
+  font-size: var(--fs-md);
+  color: var(--fg-primary);
+  font-weight: 600;
+  margin-top: var(--s-1);
+}
+
+.close {
+  color: var(--fg-tertiary);
+  font-size: var(--fs-xl);
+  line-height: 1;
+  padding: 0 var(--s-2);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.close:hover {
+  color: var(--accent-amber);
+}
+
+.bulkBar {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.bulkBtn {
+  padding: var(--s-1) var(--s-3);
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.bulkBtn:hover {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
+}
+
+.list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 24px 32px 40px 1fr;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.row:hover {
+  background: var(--bg-elev-3);
+}
+
+.rowOn {
+  background: rgba(255, 176, 0, 0.06);
+}
+
+.rowOn:hover {
+  background: rgba(255, 176, 0, 0.10);
+}
+
+.check {
+  font-size: var(--fs-md);
+  color: var(--fg-tertiary);
+}
+
+.rowOn .check {
+  color: var(--accent-amber);
+}
+
+.num {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+}
+
+.short {
+  font-size: var(--fs-xs);
+  color: var(--fg-secondary);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+}
+
+.name {
+  font-size: var(--fs-xs);
+  color: var(--fg-primary);
+}
+
+.foot {
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev-1);
+}
+
+.note {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  line-height: 1.5;
+}
