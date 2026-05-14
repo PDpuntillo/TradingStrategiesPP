@@ -68,10 +68,16 @@ class SheetsService:
         self._api_lock = threading.Lock()
 
     def _get_spreadsheet_id(self, ticker: Ticker) -> str:
-        """Resuelve el spreadsheet_id desde el ticker."""
-        # Ticker es str ahora (no Enum). Normalizar a uppercase por seguridad.
+        """Resuelve el spreadsheet_id desde el ticker.
+
+        Usa merged_sheet_ids (env vars + sheet_ids_local.json) para que
+        los tickers agregados via UI en local también funcionen.
+        """
+        # Import tardío para evitar dep circular en startup
+        from app.services.tickers_service import merged_sheet_ids
+
         key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
-        spreadsheet_id = self.settings.spreadsheet_ids_map.get(key)
+        spreadsheet_id = merged_sheet_ids().get(key)
         if not spreadsheet_id:
             raise ValueError(f"No spreadsheet configurado para ticker: {ticker}")
         return spreadsheet_id

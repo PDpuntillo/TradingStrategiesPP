@@ -57,9 +57,8 @@ export default function AddTickerModal({ open, onClose, onSuccess }) {
     }
   }
 
-  const handleCopy = () => {
-    if (!result) return
-    navigator.clipboard?.writeText(result.snippet_for_prod)
+  const copy = (text) => {
+    navigator.clipboard?.writeText(text)
   }
 
   return (
@@ -153,12 +152,22 @@ export default function AddTickerModal({ open, onClose, onSuccess }) {
 
             <div className={styles.snippetBox}>
               <div className={styles.snippetLabel}>
-                <span>SHEET_IDS_JSON =</span>
-                <button type="button" className={styles.copyBtn} onClick={handleCopy}>
+                <span>OPCIÓN A · pegar en "Add from .env" de Render</span>
+                <button type="button" className={styles.copyBtn} onClick={() => copy(result.snippet_for_prod)}>
                   ⧉ Copiar
                 </button>
               </div>
               <pre className={styles.snippet}>{result.snippet_for_prod}</pre>
+            </div>
+
+            <div className={styles.snippetBox}>
+              <div className={styles.snippetLabel}>
+                <span>OPCIÓN B · pegar en el campo VALUE (key = SHEET_IDS_JSON)</span>
+                <button type="button" className={styles.copyBtn} onClick={() => copy(result.snippet_json_only)}>
+                  ⧉ Copiar
+                </button>
+              </div>
+              <pre className={styles.snippet}>{result.snippet_json_only}</pre>
             </div>
 
             <div className={styles.actions}>
