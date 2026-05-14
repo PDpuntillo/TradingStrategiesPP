@@ -1,45 +1,74 @@
 /*
  * Design tokens — Tradingstrategys
  * ---
- * Aesthetic: Bloomberg-terminal heritage.
- * Mono everywhere. Borders-only (no shadows). Ambar accent.
- * Single hue (warm), shifts only in lightness.
+ * Aesthetic: Apple Aqua / OS X Tiger-Leopard 2009.
+ * Light theme. Skeuomorphic shadows. Glossy aqua buttons.
+ * Aluminum surfaces. Pinstripe accents donde corresponda.
  */
 
 :root {
-  /* ===== Surfaces ===== */
-  --bg-canvas: #0A0A0A;       /* el void */
-  --bg-elev-1: #121212;       /* lane background */
-  --bg-elev-2: #1A1A1A;       /* card / dropdown / drawer */
-  --bg-elev-3: #222222;       /* hover lift sutil */
-  --bg-input:  #060606;       /* inset — más oscuro que canvas */
+  /* ===== Surfaces (light, layered, with subtle gradients) ===== */
+  --bg-canvas: #E5E6E8;                  /* aluminum base */
+  --bg-window: #ECECEE;                  /* OS X window content area */
+  --bg-card: #FFFFFF;                    /* white card content */
+  --bg-card-soft: #F7F7F9;               /* secondary card */
+  --bg-elev-2: #FFFFFF;                  /* legacy alias for old components */
+  --bg-elev-1: #F7F7F9;                  /* legacy alias */
+  --bg-elev-3: #E8E8EC;                  /* legacy alias */
+  --bg-input: #FFFFFF;                   /* inputs are white not inset-dark */
+
+  /* Gradients para uso en toolbars, headers, botones */
+  --grad-toolbar: linear-gradient(180deg, #DDDDE0 0%, #B8B8BC 100%);
+  --grad-toolbar-active: linear-gradient(180deg, #E8E8EB 0%, #C0C0C5 100%);
+  --grad-card: linear-gradient(180deg, #FFFFFF 0%, #F1F1F4 100%);
+  --grad-divider: linear-gradient(90deg, transparent, rgba(0,0,0,0.18), transparent);
+
+  /* Pinstripe iTunes-style — repeating horizontal lines, muy sutil */
+  --grad-pinstripe:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0) 0,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.025) 2px,
+      rgba(0,0,0,0.025) 3px
+    );
 
   /* ===== Borders ===== */
-  --border-soft: rgba(255, 220, 130, 0.06);
-  --border:      rgba(255, 220, 130, 0.10);
-  --border-emph: rgba(255, 220, 130, 0.20);
-  --focus-ring:  rgba(255, 176, 0, 0.45);
+  --border: #BABABE;                     /* standard separator */
+  --border-soft: #D5D5D9;
+  --border-emph: #909094;
+  --border-inset-top: rgba(255, 255, 255, 0.8);   /* top highlight para sunken bevel */
+  --border-shadow: rgba(0, 0, 0, 0.18);
+  --focus-ring: rgba(59, 125, 216, 0.45);          /* Apple Blue glow */
 
   /* ===== Text — 4 levels ===== */
-  --fg-primary:    #F5EFE0;   /* marfil */
-  --fg-secondary:  #A8A095;
-  --fg-tertiary:   #6B6760;
-  --fg-muted:      #3D3A36;
+  --fg-primary: #1D1D1F;                 /* casi negro */
+  --fg-secondary: #4A4A4E;
+  --fg-tertiary: #8A8A8E;
+  --fg-muted: #B0B0B5;
 
   /* ===== Brand & semantic ===== */
-  --accent-amber: #FFB000;        /* Bloomberg amber */
-  --accent-amber-dim: #B87B00;
-  --sig-long:     #4ADE80;        /* phosphor green */
-  --sig-short:    #B03A48;        /* oxblood */
-  --sig-neutral:  #6B6760;
+  --accent-amber: #3B7DD8;                              /* alias: ahora "accent" = Apple Blue */
+  --accent-amber-dim: #2D6BC4;
+  --accent-blue: #3B7DD8;
+  --grad-aqua-blue: linear-gradient(180deg, #7AB5EF 0%, #3B7DD8 50%, #2D6BC4 100%);
+  --grad-aqua-blue-active: linear-gradient(180deg, #6FA8E9 0%, #2D6BC4 50%, #2358A8 100%);
 
-  /* ===== Chart overlays ===== */
-  --overlay-cyan:   #5EEAD4;      /* MA1 (short) */
-  --overlay-blue:   #60A5FA;      /* MA2 (mid)   */
-  --overlay-violet: #A78BFA;      /* MA3 (long)  */
-  --overlay-grid:   rgba(255, 220, 130, 0.04);
+  /* Signals — Stock Market app palette */
+  --sig-long: #2E9447;                                  /* iCal/Stocks green */
+  --grad-long: linear-gradient(180deg, #5BB36C 0%, #2E9447 50%, #237A38 100%);
+  --sig-short: #C8474A;                                 /* Stocks red */
+  --grad-short: linear-gradient(180deg, #DE7273 0%, #C8474A 50%, #A23538 100%);
+  --sig-neutral: #8A8A8E;
+  --grad-neutral: linear-gradient(180deg, #C0C0C5 0%, #9090954 50%, #707075 100%);
 
-  /* ===== Spacing — base 4px ===== */
+  /* ===== Chart overlays (legibles sobre light theme) ===== */
+  --overlay-cyan:   #2D9CB4;
+  --overlay-blue:   #3678D8;
+  --overlay-violet: #7A52C8;
+  --overlay-grid:   rgba(0, 0, 0, 0.06);
+
+  /* ===== Spacing — más aireado que terminal ===== */
   --s-0: 0;
   --s-1: 4px;
   --s-2: 8px;
@@ -47,16 +76,63 @@
   --s-4: 16px;
   --s-5: 24px;
   --s-6: 32px;
-  --s-8: 48px;
-  --s-10: 64px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-10: 80px;
 
-  /* ===== Radius (mínimo, técnico) ===== */
-  --r-sm: 2px;
-  --r-md: 4px;
-  --r-lg: 6px;
+  /* ===== Radius — rounded, friendly ===== */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-pill: 999px;
 
-  /* ===== Typography ===== */
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  /* ===== Shadows — multi-layer real depth ===== */
+  /* Card: inset highlight arriba + drop shadow + 1px border simulado */
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 3px rgba(0, 0, 0, 0.10),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+
+  --shadow-card-lifted:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.10);
+
+  /* Botón aqua: highlight arriba, sombra abajo, drop shadow externa */
+  --shadow-aqua-btn:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20),
+    0 1px 2px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.20);
+
+  --shadow-aqua-btn-active:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.20),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+
+  /* Input inset (hundido) */
+  --shadow-input:
+    inset 0 1px 2px rgba(0, 0, 0, 0.10),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+
+  --shadow-input-focus:
+    inset 0 1px 2px rgba(0, 0, 0, 0.10),
+    inset 0 0 0 1px var(--accent-blue),
+    0 0 0 3px var(--focus-ring);
+
+  /* Toolbar: separator hairline arriba + bottom highlight */
+  --shadow-toolbar:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 1px 0 rgba(0, 0, 0, 0.18);
+
+  /* Aqua "LED" indicator glow (para signal pills) */
+  --glow-long: 0 0 6px rgba(46, 148, 71, 0.5);
+  --glow-short: 0 0 6px rgba(200, 71, 74, 0.5);
+
+  /* ===== Typography — Lucida Grande / Helvetica Neue, no más mono ===== */
+  --font-system: "Lucida Grande", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Lucida Grande", "Helvetica Neue", "Helvetica", sans-serif;  /* legacy alias */
+  --font-data: "Lucida Grande", "Helvetica Neue", "Helvetica", sans-serif;
 
   --fs-micro: 10px;
   --fs-xs:    11px;
@@ -65,14 +141,20 @@
   --fs-md:    14px;
   --fs-lg:    16px;
   --fs-xl:    20px;
-  --fs-data:  24px;       /* hero números */
-  --fs-mega:  36px;
+  --fs-data:  28px;          /* hero números, à la Apple Stocks app */
+  --fs-mega:  40px;
 
-  --tracking-tight: -0.02em;
-  --tracking-wide:  0.08em;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;       /* menos agresivo que el terminal */
 
   /* ===== Motion ===== */
-  --t-fast: 90ms;
-  --t-base: 160ms;
-  --ease:   cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 200ms;
+  --ease:   cubic-bezier(0.25, 0.1, 0.25, 1);  /* OS X classic ease */
 }
