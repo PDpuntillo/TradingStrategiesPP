@@ -1,4 +1,4 @@
-# ===== Secrets =====
+# ===== Secrets / local state =====
 .env
 .env.local
 .env.*.local
@@ -6,6 +6,8 @@
 *.pem
 credentials.json
 service-account*.json
+# Local-only ticker registry (UI Add Ticker en DEBUG mode escribe acá)
+backend/app/data/sheet_ids_local.json
 
 # ===== Python =====
 # Anchored to root with leading slash to avoid matching frontend/src/lib/

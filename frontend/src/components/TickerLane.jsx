@@ -2,16 +2,18 @@ import { useTickerData } from '../hooks/useTickerData'
 import { useSignals } from '../hooks/useSignals'
 import ConsensusRail from './ConsensusRail'
 import ChartPanel from './ChartPanel'
-import SignalsStrip from './SignalsStrip'
 import { fmt, signalColor } from '../lib/format'
 import styles from './TickerLane.module.css'
 
 /*
  * TickerLane — la franja horizontal por ticker.
- * Layout: [consensus rail] · [chart] · [signals strip]
+ * Layout: [consensus rail (con todas las strategies)] · [chart]
  * Header pequeño arriba con price + delta.
+ *
+ * El SignalsStrip de la derecha se eliminó en favor del rail unificado:
+ * cada row del rail ya muestra signal + valor de referencia + precio.
  */
-export default function TickerLane({ ticker, onOpenStrategy }) {
+export default function TickerLane({ ticker, tickerName, onOpenStrategy }) {
   const { data: bars, loading: barsLoading, error: barsError } = useTickerData(ticker)
   const { data: signals, loading: sigLoading, error: sigError } = useSignals(ticker)
 
@@ -24,7 +26,7 @@ export default function TickerLane({ ticker, onOpenStrategy }) {
   return (
     <article className={styles.lane}>
       <header className={styles.head}>
-        <span className={styles.ticker}>{ticker}.BA</span>
+        <span className={styles.ticker} title={tickerName}>{ticker}.BA</span>
         <span className={`${styles.price} tabular`}>{fmt.price(last)}</span>
         <span
           className={`${styles.delta} tabular`}
@@ -58,11 +60,6 @@ export default function TickerLane({ ticker, onOpenStrategy }) {
           onSegmentClick={(n) => onOpenStrategy?.(ticker, n)}
         />
         <ChartPanel data={bars} signals={signals} loading={barsLoading} />
-        <SignalsStrip
-          signals={signals}
-          loading={sigLoading}
-          onSelectStrategy={(n) => onOpenStrategy?.(ticker, n)}
-        />
       </div>
     </article>
   )

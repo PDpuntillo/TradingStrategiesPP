@@ -1,0 +1,189 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 60;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 92vw);
+  height: min(640px, 90vh);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-emph);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  z-index: 61;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--s-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  font-size: var(--fs-micro);
+  color: var(--accent-amber);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 700;
+}
+
+.title {
+  font-size: var(--fs-md);
+  color: var(--fg-primary);
+  font-weight: 600;
+  margin-top: var(--s-1);
+}
+
+.close {
+  color: var(--fg-tertiary);
+  font-size: var(--fs-xl);
+  line-height: 1;
+  padding: 0 var(--s-2);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.close:hover {
+  color: var(--accent-amber);
+}
+
+.searchBar {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.search {
+  flex: 1;
+}
+
+.bulkBtn {
+  padding: 0 var(--s-3);
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.bulkBtn:hover {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s-2) 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 24px 60px 1fr auto;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+  transition: background var(--t-fast) var(--ease);
+  width: 100%;
+}
+
+.row:hover {
+  background: var(--bg-elev-3);
+}
+
+.rowOn {
+  background: rgba(255, 176, 0, 0.06);
+}
+
+.rowOn:hover {
+  background: rgba(255, 176, 0, 0.10);
+}
+
+.check {
+  font-size: var(--fs-md);
+  color: var(--fg-tertiary);
+}
+
+.rowOn .check {
+  color: var(--accent-amber);
+}
+
+.ticker {
+  font-size: var(--fs-xs);
+  color: var(--fg-primary);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+}
+
+.name {
+  font-size: var(--fs-xs);
+  color: var(--fg-secondary);
+}
+
+.sector {
+  font-size: var(--fs-micro);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.empty {
+  padding: var(--s-6);
+  text-align: center;
+  color: var(--fg-tertiary);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev-1);
+}
+
+.cancel,
+.apply {
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-weight: 600;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.cancel {
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.cancel:hover {
+  color: var(--fg-primary);
+}
+
+.apply {
+  background: var(--bg-input);
+  color: var(--accent-amber);
+  border: 1px solid var(--accent-amber-dim);
+}
+
+.apply:hover {
+  background: var(--accent-amber);
+  color: var(--bg-canvas);
+}

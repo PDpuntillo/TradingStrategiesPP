@@ -1,16 +1,31 @@
 import { useEffect, useState } from 'react'
 import { fmt } from '../lib/format'
 import { api } from '../lib/api'
+import AddTickerModal from './AddTickerModal'
+import LaneConfigPanel from './LaneConfigPanel'
 import styles from './Header.module.css'
-
-const TICKERS = ['GGAL', 'YPF', 'PAMP']
 
 /*
  * Header — cinta superior tipo ticker tape.
  * Brand · tickers · timestamp · clear cache.
+ *
+ * Props:
+ *   tickers: TickerInfo[] — la lista viene del Dashboard (useTickers hook)
+ *   selectedTicker: string | null
+ *   onSelectTicker: (ticker) => void
+ *   lastUpdated: ISO string
  */
-export default function Header({ selectedTicker, onSelectTicker, lastUpdated }) {
+export default function Header({
+  tickers = [],
+  selectedTicker,
+  onSelectTicker,
+  lastUpdated,
+  onTickerAdded,
+  laneConfig,         // { config, toggleVisible, showAll, hideAll, moveTicker, resetOrder }
+}) {
   const [clearing, setClearing] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [laneConfigOpen, setLaneConfigOpen] = useState(false)
 
   // Tick cada 30s para refrescar el "ahora" del clock derecho
   const [now, setNow] = useState(() => new Date())
@@ -47,18 +62,57 @@ export default function Header({ selectedTicker, onSelectTicker, lastUpdated }) 
       </div>
 
       <nav className={styles.tickers} aria-label="Tickers">
-        {TICKERS.map((t) => (
+        {tickers.map((t) => (
           <button
-            key={t}
+            key={t.ticker}
             className={`${styles.tickerBtn} ${
-              t === selectedTicker ? styles.tickerBtnActive : ''
+              t.ticker === selectedTicker ? styles.tickerBtnActive : ''
             }`}
-            onClick={() => onSelectTicker?.(t)}
+            onClick={() => onSelectTicker?.(t.ticker)}
+            title={t.name}
           >
-            {t}.BA
+            {t.ticker}.BA
           </button>
         ))}
+        <button
+          type="button"
+          className={styles.addBtn}
+          onClick={() => setAddOpen(true)}
+          title="Agregar ticker"
+        >
+          + ADD
+        </button>
+        {laneConfig && (
+          <button
+            type="button"
+            className={styles.cogBtn}
+            onClick={() => setLaneConfigOpen(true)}
+            title="Configurar lanes visibles y orden"
+          >
+            ⚙ {laneConfig.config.visible.length}/{laneConfig.config.order.length}
+          </button>
+        )}
       </nav>
+
+      <AddTickerModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSuccess={() => onTickerAdded?.()}
+      />
+
+      {laneConfig && (
+        <LaneConfigPanel
+          open={laneConfigOpen}
+          onClose={() => setLaneConfigOpen(false)}
+          availableTickers={tickers}
+          config={laneConfig.config}
+          onToggle={laneConfig.toggleVisible}
+          onShowAll={laneConfig.showAll}
+          onHideAll={laneConfig.hideAll}
+          onMove={laneConfig.moveTicker}
+          onReset={laneConfig.resetOrder}
+        />
+      )}
 
       <div className={styles.right}>
         <span className={styles.label}>last fetch</span>

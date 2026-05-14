@@ -1,57 +1,60 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePortfolio } from '../hooks/usePortfolio'
-import { useTickerData } from '../hooks/useTickerData'
+import { useAllTickers } from '../hooks/useTickers'
+import TickerPicker from './TickerPicker'
 import { fmt } from '../lib/format'
 import styles from './PortfolioOptimizer.module.css'
 
-const TICKERS = ['GGAL', 'YPF', 'PAMP']
-
 /*
  * PortfolioOptimizer — strategy 18, Sharpe maximization.
- * Bars horizontales, una por ticker, ancho = abs(weight).
- * Pesos negativos (cuando dollar_neutral=true) se pintan en oxblood.
  *
- * Inversión mínima = suma del último close de cada ticker
- * (equivalente a 1 acción de cada uno, redondeada hacia arriba).
- * Sin máximo. Lee los precios via useTickerData con el mismo limit
- * que TickerLane → cache hit en el backend, no genera fetch extra.
+ * La selección de tickers es independiente del dashboard:
+ * - Default: los disponibles en el dashboard (props.availableTickers)
+ * - Editable via cog → modal TickerPicker (busca en la master list /tickers/all,
+ *   filtrada a los que tienen sheet_id)
+ *
+ * Lookback default 504d (~2 años) — la covarianza Sharpe-max es mucho
+ * más estable con ventana larga.
+ *
+ * El min de inversión lo valida el backend (devuelve 400 si no hay datos
+ * suficientes); del lado UI solo gateamos por count de tickers >= 2.
  */
-export default function PortfolioOptimizer() {
+export default function PortfolioOptimizer({ availableTickers = [] }) {
   const { data, loading, error, optimize } = usePortfolio()
+  const { data: allTickers } = useAllTickers()
 
-  // Trae el último close de cada ticker (cache hit del backend).
-  const ggal = useTickerData('GGAL')
-  const ypf = useTickerData('YPF')
-  const pamp = useTickerData('PAMP')
+  const [selectedTickers, setSelectedTickers] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
-  // Mínimo dinámico: suma de 1 acción de cada ticker
-  const minInvestment = useMemo(() => {
-    const last = (d) => d?.bars?.[d.bars.length - 1]?.close
-    const sum =
-      (last(ggal.data) ?? 0) +
-      (last(ypf.data) ?? 0) +
-      (last(pamp.data) ?? 0)
-    return sum > 0 ? Math.ceil(sum) : null
-  }, [ggal.data, ypf.data, pamp.data])
+  // Sync inicial: arrancar con todos los del dashboard (los que tienen sheet)
+  useEffect(() => {
+    if (selectedTickers.length === 0 && availableTickers.length > 0) {
+      setSelectedTickers(availableTickers.map((t) => t.ticker))
+    }
+  }, [availableTickers]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pricesLoading = ggal.loading || ypf.loading || pamp.loading
-
-  const [lookback, setLookback] = useState(252)
+  const [lookback, setLookback] = useState(504)
   const [dollarNeutral, setDollarNeutral] = useState(false)
   const [investment, setInvestment] = useState(100000)
 
-  const investmentTooLow = minInvestment != null && investment < minInvestment
+  const tooFewTickers = selectedTickers.length < 2
 
   const handleRun = (e) => {
     e.preventDefault()
-    if (investmentTooLow) return
+    if (tooFewTickers) return
     optimize({
-      tickers: TICKERS,
+      tickers: selectedTickers,
       lookback_days: lookback,
       dollar_neutral: dollarNeutral,
       total_investment: investment,
     })
   }
+
+  // El picker filtra por los que tienen sheet configurado (no toda la lista).
+  // Eso es lo que devuelve /api/tickers/all? No — eso da TODOS. Para el picker
+  // del optimizer queremos solo los disponibles, no los que aún no se crearon.
+  // Como availableTickers ya viene filtrado, lo usamos.
+  const pickerOptions = availableTickers.length > 0 ? availableTickers : (allTickers ?? [])
 
   const maxAbsWeight = data?.weights
     ? Math.max(...data.weights.map((w) => Math.abs(w.weight)), 0.0001)
@@ -64,15 +67,33 @@ export default function PortfolioOptimizer() {
           <div className={styles.eyebrow}>STRATEGY 18</div>
           <div className={styles.title}>PORTFOLIO OPTIMIZATION · SHARPE MAX</div>
         </div>
+        <button
+          type="button"
+          className={styles.cog}
+          onClick={() => setPickerOpen(true)}
+          title="Configurar tickers"
+        >
+          ⚙ {selectedTickers.length} TICKERS
+        </button>
       </header>
+
+      {tooFewTickers && (
+        <div className={styles.warning}>
+          Seleccioná al menos 2 tickers para optimizar.
+        </div>
+      )}
 
       <form className={styles.form} onSubmit={handleRun}>
         <div className={styles.field}>
-          <label className={styles.lbl}>LOOKBACK (días)</label>
+          <label className={styles.lbl}>
+            LOOKBACK (días)
+            <span className={styles.bounds}>[30 — 1260]</span>
+          </label>
           <input
             type="number"
             min={30}
-            max={1000}
+            max={1260}
+            step={1}
             value={lookback}
             onChange={(e) => setLookback(parseInt(e.target.value, 10))}
           />
@@ -81,21 +102,14 @@ export default function PortfolioOptimizer() {
         <div className={styles.field}>
           <label className={styles.lbl}>
             INVERSIÓN TOTAL
-            <span className={styles.bounds}>
-              {pricesLoading
-                ? '[cargando precios…]'
-                : minInvestment != null
-                  ? `[min ≥ ${fmt.price(minInvestment)} · sin máx]`
-                  : '[sin límite]'}
-            </span>
+            <span className={styles.bounds}>[sin máx]</span>
           </label>
           <input
             type="number"
-            min={minInvestment ?? 1}
+            min={1}
             step="any"
             value={investment}
             onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
-            aria-invalid={investmentTooLow}
           />
         </div>
 
@@ -115,17 +129,19 @@ export default function PortfolioOptimizer() {
         <button
           type="submit"
           className={styles.submit}
-          disabled={loading || pricesLoading || investmentTooLow}
+          disabled={loading || tooFewTickers}
         >
           {loading ? 'OPTIMIZANDO…' : 'OPTIMIZAR'}
         </button>
       </form>
 
-      {investmentTooLow && (
-        <div className={styles.error}>
-          Inversión insuficiente. Mínimo {fmt.price(minInvestment)} (1 acción de cada ticker).
-        </div>
-      )}
+      <TickerPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        allTickers={pickerOptions}
+        selected={selectedTickers}
+        onChange={setSelectedTickers}
+      />
 
       {error && (
         <div className={styles.error}>{String(error.message ?? error)}</div>
@@ -133,7 +149,6 @@ export default function PortfolioOptimizer() {
 
       {data && (
         <div className={styles.result}>
-          {/* Stats top */}
           <div className={styles.stats}>
             <Stat label="SHARPE" value={fmt.ratio(data.sharpe_ratio)} accent />
             <Stat label="RETURN" value={fmt.pct(data.portfolio_return)} />
@@ -141,7 +156,6 @@ export default function PortfolioOptimizer() {
             <Stat label="MODE" value={data.dollar_neutral ? 'NEUTRAL' : 'LONG-ONLY'} />
           </div>
 
-          {/* Bars */}
           <div className={styles.bars}>
             {data.weights.map((w) => {
               const widthPct = (Math.abs(w.weight) / maxAbsWeight) * 100

@@ -5,8 +5,36 @@
 }
 
 .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--border);
+}
+
+.cog {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-secondary);
+  border: 1px solid var(--border);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-sm);
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  font-weight: 600;
+}
+
+.cog:hover {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
+}
+
+.warning {
+  margin: var(--s-3) var(--s-4) 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px dashed var(--accent-amber-dim);
+  color: var(--accent-amber);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
 }
 
 .eyebrow {

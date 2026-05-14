@@ -68,8 +68,16 @@ class SheetsService:
         self._api_lock = threading.Lock()
 
     def _get_spreadsheet_id(self, ticker: Ticker) -> str:
-        """Resuelve el spreadsheet_id desde el ticker."""
-        spreadsheet_id = self.settings.spreadsheet_ids_map.get(ticker.value)
+        """Resuelve el spreadsheet_id desde el ticker.
+
+        Usa merged_sheet_ids (env vars + sheet_ids_local.json) para que
+        los tickers agregados via UI en local también funcionen.
+        """
+        # Import tardío para evitar dep circular en startup
+        from app.services.tickers_service import merged_sheet_ids
+
+        key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
+        spreadsheet_id = merged_sheet_ids().get(key)
         if not spreadsheet_id:
             raise ValueError(f"No spreadsheet configurado para ticker: {ticker}")
         return spreadsheet_id
@@ -91,7 +99,8 @@ class SheetsService:
         Returns:
             Lista de filas (cada fila es lista de strings)
         """
-        cache_key = f"{ticker.value}:{sheet_name}:{cell_range}"
+        ticker_key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
+        cache_key = f"{ticker_key}:{sheet_name}:{cell_range}"
 
         # 1. Cache hit (fast path, sin lock)
         if cache_key in self._cache:
@@ -140,7 +149,7 @@ class SheetsService:
                 )
             values = result.get("values", [])
             self._cache[cache_key] = values
-            logger.info(f"Sheets READ: {ticker.value}/{sheet_name} ({len(values)} rows)")
+            logger.info(f"Sheets READ: {ticker_key}/{sheet_name} ({len(values)} rows)")
             return values
 
         except HttpError as e:
@@ -164,9 +173,16 @@ class SheetsService:
         Columna D: Low
         Columna E: Close
         Columna F: Volume
+
+        Se lee TODO el rango (A2:F sin end row) y luego se slicea las
+        últimas `limit` barras. Antes leíamos A2:F{limit+1} que devolvía
+        las PRIMERAS limit filas — funcionaba por casualidad cuando la
+        sheet tenía ~limit filas, pero al expandir el histórico (ej. 5y)
+        el chart mostraba las barras MÁS VIEJAS en lugar de las recientes.
         """
-        cell_range = f"A2:F{limit + 1}"
-        rows = self.read_range(ticker, "RAW_DATA", cell_range)
+        # Range sin upper bound: la API de Sheets devuelve todas las filas
+        # con datos. Cache key se vuelve estable (no depende del limit).
+        rows = self.read_range(ticker, "RAW_DATA", "A2:F")
 
         bars: List[PriceBar] = []
         for row in rows:
@@ -191,6 +207,11 @@ class SheetsService:
             except (ValueError, IndexError) as e:
                 logger.warning(f"Skip row inválida: {row} - {e}")
                 continue
+
+        # Las barras vienen en orden cronológico ascendente. Tomar las
+        # últimas `limit` para que el frontend siempre vea lo más reciente.
+        if limit and len(bars) > limit:
+            bars = bars[-limit:]
 
         return TickerData(
             ticker=ticker,
@@ -232,13 +253,18 @@ class SheetsService:
     @staticmethod
     def _parse_timestamp(value: str) -> datetime:
         """Parsea timestamp en formatos comunes de Google Sheets."""
+        # ⚠️ ORDEN CRÍTICO: M/D va PRIMERO porque GOOGLEFINANCE devuelve fechas
+        # en US locale (M/D/Y) por default, sin importar el locale del Sheet.
+        # Si pusiéramos D/M antes, fechas como "3/11/2025" (Mar 11) las parsearía
+        # como d=3,m=11 → Nov 3 (silenciosamente mal). Solo fechas con día > 12
+        # (ej. "3/13") harían fallar el match D/M y caerían a M/D.
         formats = [
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%d",
-            "%d/%m/%Y %H:%M:%S",
+            "%m/%d/%Y %H:%M:%S",   # GOOGLEFINANCE M/D/Y con hora (más común)
+            "%m/%d/%Y",            # GOOGLEFINANCE M/D/Y solo fecha
+            "%d/%m/%Y %H:%M:%S",   # fallback para sheets en locale es-AR
             "%d/%m/%Y",
-            "%m/%d/%Y %H:%M:%S",   # GOOGLEFINANCE US locale: 5/13/2025 17:00:00
-            "%m/%d/%Y",
         ]
         for fmt in formats:
             try:

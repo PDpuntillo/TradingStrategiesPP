@@ -55,11 +55,13 @@ En la sección **Environment Variables** agregá:
 |---|---|
 | `PYTHON_VERSION` | `3.11.9` ← **obligatorio**, ver nota abajo |
 | `GOOGLE_SHEETS_API_KEY` | tu API key (la que tenés en `backend/.env`) |
-| `SPREADSHEET_ID_GGAL` | el ID de la sheet GGAL |
-| `SPREADSHEET_ID_YPF` | el ID de la sheet YPF |
-| `SPREADSHEET_ID_PAMP` | el ID de la sheet PAMP |
+| `SHEET_IDS_JSON` | `{"GGAL":"…","YPF":"…","PAMP":"…","TXAR":"…",...}` ← preferido para 4+ tickers |
 | `CORS_ORIGINS` | `http://localhost:5173` (lo actualizamos después con la URL de Vercel) |
 | `CACHE_TTL_SECONDS` | `300` |
+
+**Nota sobre `SHEET_IDS_JSON`**: es un JSON con un mapa `{"TICKER":"sheet_id"}`. Más fácil de mantener que un env var por ticker cuando agregás muchos.
+
+Las vars legacy `SPREADSHEET_ID_GGAL`, `SPREADSHEET_ID_YPF`, `SPREADSHEET_ID_PAMP` siguen funcionando (compatibilidad hacia atrás del primer deploy). Si están seteadas, se merguean con `SHEET_IDS_JSON`; el JSON gana ante colisión. Podés quedarte solo con las legacy si tenés solo 3 tickers, o migrar todo a JSON.
 
 > ⚠️ **No pongas `PORT`** — Render lo inyecta automáticamente. El Dockerfile lo lee con `${PORT:-8000}`.
 >

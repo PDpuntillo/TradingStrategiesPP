@@ -165,11 +165,13 @@ copy .env.example .env
 notepad .env
 # → completar GOOGLE_SHEETS_API_KEY + 3 SPREADSHEET_ID_*
 
-# Correr
-uvicorn app.main:app --reload
+# Correr (watcheando .py + .env para que cambios al env no necesiten Ctrl+C)
+uvicorn app.main:app --reload --reload-include "*.env"
 ```
 
 → Backend en http://127.0.0.1:8000 · Swagger en http://127.0.0.1:8000/docs
+
+> Para agregar tickers al vuelo: usá el botón **+ ADD** en el header del frontend. Pop-up con [símbolo, sheet ID/URL] → en local persiste a `backend/app/data/sheet_ids_local.json` (gitignored), aparece al toque. En prod muestra un snippet listo para copiar al env var de Render.
 
 ### 5. Frontend (otra terminal)
 

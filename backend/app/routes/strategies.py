@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.strategy import (
     Ticker,
+    TickerInfo,
     TickerData,
     AllSignals,
     Strategy11Input, Strategy11Output,
@@ -22,9 +23,77 @@ from app.services.strategy_service import (
     strategy_14, strategy_15, strategy_18,
     compute_consensus_signal,
 )
+from app.services.tickers_service import (
+    list_available_tickers,
+    list_all_tickers_meta,
+    is_ticker_available,
+    add_local_ticker,
+)
+from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/api", tags=["strategies"])
+
+
+def _validate_ticker(ticker: str) -> str:
+    """Normaliza a uppercase y valida que esté disponible."""
+    t = ticker.upper()
+    if not is_ticker_available(t):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ticker '{t}' no configurado. Ver /api/tickers para la lista disponible.",
+        )
+    return t
+
+
+# ============================================
+# TICKERS REGISTRY
+# ============================================
+@router.get("/tickers", response_model=List[TickerInfo])
+def list_tickers():
+    """Lista de tickers disponibles (con sheet configurado y metadata)."""
+    return list_available_tickers()
+
+
+@router.get("/tickers/all", response_model=List[TickerInfo])
+def list_all_tickers():
+    """
+    Master list completa del registry (incluye tickers sin sheet configurado).
+    Útil para que el frontend muestre un selector con la lista completa Merval.
+    """
+    return list_all_tickers_meta()
+
+
+class AddTickerInput(BaseModel):
+    ticker: str
+    sheet_id_or_url: str
+
+
+class AddTickerOutput(BaseModel):
+    ticker: str
+    sheet_id: str
+    persisted_locally: bool
+    snippet_for_prod: str   # SPREADSHEET_ID_<TICKER>=<sheet_id> — pasteable en "Add from .env"
+    render_key: str         # para el form key/value de Render: este va al field KEY
+    render_value: str       # para el form key/value de Render: este va al field VALUE
+
+
+@router.post("/tickers/add", response_model=AddTickerOutput)
+def add_ticker(payload: AddTickerInput):
+    """
+    Agrega un ticker al registry.
+
+    En dev (DEBUG=True): persiste a sheet_ids_local.json y queda
+    inmediatamente disponible en el listing.
+
+    En prod (DEBUG=False): NO persiste (filesystem efímero), pero
+    devuelve el snippet que el usuario tiene que copiar al env var
+    SHEET_IDS_JSON en el dashboard de Render.
+    """
+    try:
+        return AddTickerOutput(**add_local_ticker(payload.ticker, payload.sheet_id_or_url))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================
@@ -32,21 +101,18 @@ router = APIRouter(prefix="/api", tags=["strategies"])
 # ============================================
 @router.get("/ticker/{ticker}", response_model=TickerData)
 def get_ticker_data(
-    ticker: Ticker,
+    ticker: str,
     limit: int = 500,
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Lee RAW_DATA del ticker desde Google Sheets."""
+    t = _validate_ticker(ticker)
     try:
-        return sheets.get_raw_data(ticker, limit=limit)
+        return sheets.get_raw_data(t, limit=limit)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/tickers", response_model=List[Ticker])
-def list_tickers():
-    """Lista de tickers disponibles."""
-    return list(Ticker)
 
 
 # ============================================
@@ -58,7 +124,9 @@ def run_strategy_11(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 11 - Single Moving Average."""
-    data = sheets.get_raw_data(params.ticker)
+    t = _validate_ticker(params.ticker)
+    params.ticker = t
+    data = sheets.get_raw_data(t)
     if len(data.bars) < params.ma_period + 1:
         raise HTTPException(
             status_code=400,
@@ -76,7 +144,9 @@ def run_strategy_12(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 12 - Dual MA + Stop-Loss."""
-    data = sheets.get_raw_data(params.ticker)
+    t = _validate_ticker(params.ticker)
+    params.ticker = t
+    data = sheets.get_raw_data(t)
     min_bars = max(params.ma_short_period, params.ma_long_period) + 1
     if len(data.bars) < min_bars:
         raise HTTPException(
@@ -95,7 +165,9 @@ def run_strategy_13(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 13 - Triple MA Filter."""
-    data = sheets.get_raw_data(params.ticker)
+    t = _validate_ticker(params.ticker)
+    params.ticker = t
+    data = sheets.get_raw_data(t)
     min_bars = max(params.ma1_period, params.ma2_period, params.ma3_period) + 1
     if len(data.bars) < min_bars:
         raise HTTPException(
@@ -114,7 +186,9 @@ def run_strategy_14(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 14 - Support & Resistance (Pivots)."""
-    data = sheets.get_raw_data(params.ticker)
+    t = _validate_ticker(params.ticker)
+    params.ticker = t
+    data = sheets.get_raw_data(t)
     if len(data.bars) < 2:
         raise HTTPException(status_code=400, detail="Necesito al menos 2 barras")
     return strategy_14(data.bars, params)
@@ -129,7 +203,9 @@ def run_strategy_15(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 15 - Donchian Channel."""
-    data = sheets.get_raw_data(params.ticker)
+    t = _validate_ticker(params.ticker)
+    params.ticker = t
+    data = sheets.get_raw_data(t)
     if len(data.bars) < params.channel_period + 1:
         raise HTTPException(
             status_code=400,
@@ -147,13 +223,23 @@ def run_strategy_18(
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Strategy 18 - Portfolio Optimization (Sharpe maximization)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Strategy 18 requiere al menos 2 tickers",
+        )
+
+    # Validar y normalizar todos los tickers antes de pegarle a Sheets
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
     bars_by_ticker = {}
-    for ticker in params.tickers:
+    for ticker in normalized:
         data = sheets.get_raw_data(ticker, limit=params.lookback_days + 10)
         if len(data.bars) < 30:
             raise HTTPException(
                 status_code=400,
-                detail=f"Datos insuficientes para {ticker.value}",
+                detail=f"Datos insuficientes para {ticker}",
             )
         bars_by_ticker[ticker] = data.bars
 
@@ -165,18 +251,19 @@ def run_strategy_18(
 # ============================================
 @router.get("/signals/{ticker}", response_model=AllSignals)
 def get_all_signals(
-    ticker: Ticker,
+    ticker: str,
     sheets: SheetsService = Depends(get_sheets_service),
 ):
     """Calcula las 5 estrategias de signal y devuelve consensus."""
-    data = sheets.get_raw_data(ticker)
+    t = _validate_ticker(ticker)
+    data = sheets.get_raw_data(t)
 
     results = {}
     signals = []
 
     # Strategy 11
     try:
-        out11 = strategy_11(data.bars, Strategy11Input(ticker=ticker))
+        out11 = strategy_11(data.bars, Strategy11Input(ticker=t))
         results["strategy_11"] = out11
         signals.append(out11.signal)
     except Exception:
@@ -184,7 +271,7 @@ def get_all_signals(
 
     # Strategy 12
     try:
-        out12 = strategy_12(data.bars, Strategy12Input(ticker=ticker))
+        out12 = strategy_12(data.bars, Strategy12Input(ticker=t))
         results["strategy_12"] = out12
         signals.append(out12.signal)
     except Exception:
@@ -192,7 +279,7 @@ def get_all_signals(
 
     # Strategy 13
     try:
-        out13 = strategy_13(data.bars, Strategy13Input(ticker=ticker))
+        out13 = strategy_13(data.bars, Strategy13Input(ticker=t))
         results["strategy_13"] = out13
         signals.append(out13.signal)
     except Exception:
@@ -200,7 +287,7 @@ def get_all_signals(
 
     # Strategy 14
     try:
-        out14 = strategy_14(data.bars, Strategy14Input(ticker=ticker))
+        out14 = strategy_14(data.bars, Strategy14Input(ticker=t))
         results["strategy_14"] = out14
         signals.append(out14.signal)
     except Exception:
@@ -208,7 +295,7 @@ def get_all_signals(
 
     # Strategy 15
     try:
-        out15 = strategy_15(data.bars, Strategy15Input(ticker=ticker))
+        out15 = strategy_15(data.bars, Strategy15Input(ticker=t))
         results["strategy_15"] = out15
         signals.append(out15.signal)
     except Exception:
@@ -217,7 +304,7 @@ def get_all_signals(
     consensus = compute_consensus_signal(signals)
 
     return AllSignals(
-        ticker=ticker,
+        ticker=t,
         **results,
         consensus_signal=consensus,
         timestamp=datetime.now(),

@@ -17,11 +17,18 @@ class SignalType(str, Enum):
     EXIT_SHORT = "EXIT_SHORT"
 
 
-class Ticker(str, Enum):
-    """Tickers soportados en MVP."""
-    GGAL = "GGAL"
-    YPF = "YPF"
-    PAMP = "PAMP"
+# Ticker es un alias de str — la lista válida es dinámica y se valida
+# en runtime contra settings.spreadsheet_ids_map (ver sheets_service).
+# Mantener como str (no Enum) permite agregar tickers sin cambios de código.
+Ticker = str
+
+
+class TickerInfo(BaseModel):
+    """Metadata de un ticker para el frontend (nombre display, sector, etc)."""
+    ticker: str
+    name: str
+    sector: Optional[str] = None
+    currency: str = "ARS"
 
 
 # ============================================
@@ -156,7 +163,10 @@ class Strategy15Output(BaseModel):
 class Strategy18Input(BaseModel):
     """Input para Strategy 18 (Sharpe maximization)."""
     tickers: List[Ticker]
-    lookback_days: int = Field(default=252, ge=30, le=1000)
+    # Default 504 días = ~2 años de trading; máximo 5 años. La estimación
+    # de covarianza Sharpe-max es mucho más estable con ventanas largas
+    # (con 1 año hay demasiado peso de eventos cortos).
+    lookback_days: int = Field(default=504, ge=30, le=1260)
     dollar_neutral: bool = Field(default=False)
     total_investment: float = Field(default=10000.0, gt=0)
 

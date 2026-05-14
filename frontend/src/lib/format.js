@@ -12,6 +12,7 @@ const nf = (digits) =>
 const F2 = nf(2)
 const F4 = nf(4)
 const F0 = nf(0)
+
 const PCT = new Intl.NumberFormat('es-AR', {
   style: 'percent',
   minimumFractionDigits: 2,
@@ -23,24 +24,37 @@ export const fmt = {
   pct: (v) => (v == null ? '—' : PCT.format(v)),
   ratio: (v) => (v == null ? '—' : F4.format(v)),
   int: (v) => (v == null ? '—' : F0.format(v)),
+  // DD/MM/YYYY HH:MM — formato manual, día siempre primero, mes siempre segundo.
   ts: (v) => {
     if (!v) return '—'
     const d = new Date(v)
-    return d.toLocaleString('es-AR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`
   },
+  // DD/MM corto para ejes de chart (sin año, sin hora).
   date: (v) => {
     if (!v) return '—'
     const d = new Date(v)
-    return d.toLocaleDateString('es-AR', {
-      month: '2-digit',
-      day: '2-digit',
-    })
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}/${mm}`
+  },
+  // DD/MM/YY — para los handles del Brush, donde el año importa
+  // porque podés navegar varios años de historia.
+  dateY: (v) => {
+    if (!v) return '—'
+    const d = new Date(v)
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yy = String(d.getFullYear()).slice(-2)
+    return `${dd}/${mm}/${yy}`
   },
 }
 
