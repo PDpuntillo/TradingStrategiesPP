@@ -235,13 +235,18 @@ class SheetsService:
     @staticmethod
     def _parse_timestamp(value: str) -> datetime:
         """Parsea timestamp en formatos comunes de Google Sheets."""
+        # ⚠️ ORDEN CRÍTICO: M/D va PRIMERO porque GOOGLEFINANCE devuelve fechas
+        # en US locale (M/D/Y) por default, sin importar el locale del Sheet.
+        # Si pusiéramos D/M antes, fechas como "3/11/2025" (Mar 11) las parsearía
+        # como d=3,m=11 → Nov 3 (silenciosamente mal). Solo fechas con día > 12
+        # (ej. "3/13") harían fallar el match D/M y caerían a M/D.
         formats = [
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%d",
-            "%d/%m/%Y %H:%M:%S",
+            "%m/%d/%Y %H:%M:%S",   # GOOGLEFINANCE M/D/Y con hora (más común)
+            "%m/%d/%Y",            # GOOGLEFINANCE M/D/Y solo fecha
+            "%d/%m/%Y %H:%M:%S",   # fallback para sheets en locale es-AR
             "%d/%m/%Y",
-            "%m/%d/%Y %H:%M:%S",   # GOOGLEFINANCE US locale: 5/13/2025 17:00:00
-            "%m/%d/%Y",
         ]
         for fmt in formats:
             try:

@@ -239,3 +239,28 @@ def test_consensus_tie():
 
 def test_consensus_empty():
     assert compute_consensus_signal([]) == SignalType.HOLD
+
+
+# ============================================
+# TEST: Timestamp parser (sheets_service)
+# ============================================
+# Regresión: GOOGLEFINANCE devuelve M/D/Y, NO D/M/Y. Si el orden de
+# formatos en _parse_timestamp se invierte, fechas con día <=12 se
+# interpretan al revés sin error.
+def test_parse_timestamp_googlefinance_us_format():
+    from app.services.sheets_service import SheetsService
+
+    # Casos ambiguos (día y mes ambos <=12) — regresión clave
+    assert SheetsService._parse_timestamp("3/11/2025 17:00:00").month == 3   # Mar 11
+    assert SheetsService._parse_timestamp("3/11/2025 17:00:00").day == 11
+    assert SheetsService._parse_timestamp("3/12/2025 17:00:00").month == 3   # Mar 12
+    assert SheetsService._parse_timestamp("11/2/2025 17:00:00").month == 11  # Nov 2
+    assert SheetsService._parse_timestamp("11/2/2025 17:00:00").day == 2
+
+    # Casos no ambiguos (día > 12) — ya andaban antes
+    assert SheetsService._parse_timestamp("3/13/2025 17:00:00").month == 3
+    assert SheetsService._parse_timestamp("5/13/2025 17:00:00").day == 13
+
+    # ISO format (legacy)
+    iso = SheetsService._parse_timestamp("2025-03-11 17:00:00")
+    assert iso.month == 3 and iso.day == 11
