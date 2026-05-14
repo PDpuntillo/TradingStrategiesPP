@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import TickerLane from '../components/TickerLane'
 import PortfolioOptimizer from '../components/PortfolioOptimizer'
+import CrossSectionalPanel from '../components/CrossSectionalPanel'
 import StrategySelector from '../components/StrategySelector'
 import { useTickers } from '../hooks/useTickers'
 import { useLaneConfig } from '../hooks/useLaneConfig'
@@ -65,6 +66,8 @@ export default function Dashboard() {
         ))}
 
         <PortfolioOptimizer availableTickers={tickers ?? []} />
+
+        <CrossSectionalPanel availableTickers={tickers ?? []} />
 
         <footer className={styles.footer}>
           <span>Kakushadze & Serur (2018) · 151 Trading Strategies · #11–15, 18</span>

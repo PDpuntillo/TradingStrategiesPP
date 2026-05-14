@@ -38,6 +38,10 @@ export const api = {
   runStrategy: (n, params) =>
     request(`/strategy/${n}`, { method: 'POST', body: JSON.stringify(params) }),
 
+  // ===== Cross-sectional strategies =====
+  runCrossStrategy: (name, params) =>
+    request(`/cross/${name}`, { method: 'POST', body: JSON.stringify(params) }),
+
   // ===== Signals + consensus =====
   getSignals: (ticker) => request(`/signals/${ticker}`),
 

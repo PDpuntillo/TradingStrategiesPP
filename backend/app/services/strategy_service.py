@@ -29,6 +29,8 @@ from app.models.strategy import (
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
     PortfolioWeight,
+    CrossRankingItem, CrossRankingOutput,
+    PriceMomentumInput,
 )
 
 
@@ -408,6 +410,131 @@ def strategy_18(
         sharpe_ratio=sharpe_ratio,
         dollar_neutral=params.dollar_neutral,
         total_investment=params.total_investment,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL HELPERS
+# ============================================
+def _assign_deciles_and_signals(items_sorted_desc: List[CrossRankingItem]) -> None:
+    """
+    Asigna decile (1..10) y signal (LONG/SHORT/HOLD) in-place.
+    Asume items ordenados descendentemente por factor (1 = mejor).
+
+    - Decile 1 (top 10%) → LONG
+    - Decile 10 (bottom 10%) → SHORT
+    - Resto → HOLD
+
+    Si hay <10 tickers, usa quintiles: top 20% LONG, bottom 20% SHORT.
+    Si hay <5, top 1 LONG, bottom 1 SHORT, resto HOLD.
+    """
+    n = len(items_sorted_desc)
+    if n == 0:
+        return
+
+    if n >= 10:
+        size = max(1, n // 10)  # ~10% por decile
+        long_cutoff = size
+        short_cutoff = n - size
+    elif n >= 5:
+        size = max(1, n // 5)
+        long_cutoff = size
+        short_cutoff = n - size
+    else:
+        long_cutoff = 1
+        short_cutoff = n - 1
+
+    for i, item in enumerate(items_sorted_desc):
+        item.rank = i + 1
+        # decile aproximado para todos
+        item.decile = min(10, int(10 * i / n) + 1)
+        if i < long_cutoff:
+            item.signal = SignalType.LONG
+        elif i >= short_cutoff:
+            item.signal = SignalType.SHORT
+        else:
+            item.signal = SignalType.HOLD
+
+
+# ============================================
+# CROSS-SECTIONAL #1: PRICE MOMENTUM
+# ============================================
+def price_momentum(
+    bars_by_ticker: dict,
+    params: PriceMomentumInput,
+) -> CrossRankingOutput:
+    """
+    Paper #1 — Price Momentum.
+
+    Para cada ticker calcula el cumulative return de los últimos T días,
+    skippeando los últimos S días (Jegadeesh-Titman convention para evitar
+    short-term reversal).
+
+    Si risk_adjusted=True, divide por la volatilidad del período (Sharpe-like).
+
+    Rankea descendentemente (mayor return → mayor rank → top decile = LONG).
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+
+    formation = params.formation_days
+    skip = params.skip_days
+    needed = formation + skip + 1  # bars necesarios
+
+    for ticker, bars in bars_by_ticker.items():
+        if len(bars) < needed:
+            items.append(CrossRankingItem(
+                ticker=ticker,
+                factor_value=None,
+                rank=None,
+                decile=None,
+                signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+
+        closes = np.array([b.close for b in bars], dtype=float)
+        # Ventana: hasta el bar -skip (exclusivo), formation bars hacia atrás.
+        end_idx = len(closes) - skip
+        start_idx = end_idx - formation
+        # Cumulative return entre start y end-1
+        p_start = closes[start_idx]
+        p_end = closes[end_idx - 1]
+        cum_return = (p_end / p_start) - 1.0 if p_start > 0 else 0.0
+
+        if params.risk_adjusted:
+            window = closes[start_idx:end_idx]
+            rets = np.diff(window) / window[:-1]
+            sigma = float(np.std(rets, ddof=1)) if len(rets) > 1 else 0.0
+            factor = (cum_return / sigma) if sigma > 0 else 0.0
+        else:
+            factor = cum_return
+
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=float(factor),
+            rank=None,
+            decile=None,
+            signal=SignalType.HOLD,
+        ))
+
+    # Separar los con data y sin data, rankear solo los válidos
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value, reverse=True)  # desc
+    _assign_deciles_and_signals(with_data)
+
+    # Devolver: primero los rankeados, después los skippeados
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="price_momentum",
+        description=f"Cumulative return last {formation}d, skip {skip}d"
+                    + (" (risk-adjusted)" if params.risk_adjusted else ""),
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
         timestamp=datetime.now(),
     )
 

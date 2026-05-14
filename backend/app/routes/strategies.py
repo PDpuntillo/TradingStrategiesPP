@@ -16,11 +16,13 @@ from app.models.strategy import (
     Strategy14Input, Strategy14Output,
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
+    PriceMomentumInput, CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
 from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
+    price_momentum,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -244,6 +246,33 @@ def run_strategy_18(
         bars_by_ticker[ticker] = data.bars
 
     return strategy_18(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #1: PRICE MOMENTUM
+# ============================================
+@router.post("/cross/momentum", response_model=CrossRankingOutput)
+def run_price_momentum(
+    params: PriceMomentumInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by cumulative return (paper #1)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional momentum requiere al menos 2 tickers",
+        )
+
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    bars_by_ticker = {}
+    needed = params.formation_days + params.skip_days + 1
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+
+    return price_momentum(bars_by_ticker, params)
 
 
 # ============================================

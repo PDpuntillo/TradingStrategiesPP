@@ -204,3 +204,40 @@ class AllSignals(BaseModel):
     strategy_15: Optional[Strategy15Output] = None
     consensus_signal: SignalType
     timestamp: datetime
+
+
+# ============================================
+# CROSS-SECTIONAL STRATEGIES (paper sections #1-10)
+# ============================================
+# Estrategias que rankean tickers entre sí (no per-ticker individual).
+# Output común: lista de items con factor_value, rank, decile, signal.
+
+class CrossRankingItem(BaseModel):
+    """Una entry en un ranking cross-sectional."""
+    ticker: Ticker
+    factor_value: Optional[float]   # el valor del factor (return, vol, B/P, etc.)
+    rank: Optional[int]             # 1 = mejor, N = peor (depende del strategy)
+    decile: Optional[int]           # 1..10. None si insuf data.
+    signal: SignalType              # LONG si top decile, SHORT si bottom, HOLD el resto
+
+
+class CrossRankingOutput(BaseModel):
+    """Output común de las estrategias cross-sectional de tipo ranking."""
+    strategy_name: str              # "price_momentum", "low_volatility", "value", etc.
+    description: str                # human-readable
+    items: List[CrossRankingItem]
+    n_tickers: int                  # cuántos tickers efectivamente rankeados
+    n_skipped: int                  # cuántos sin data suficiente
+    timestamp: datetime
+
+
+class PriceMomentumInput(BaseModel):
+    """Input para Price Momentum (paper #1)."""
+    tickers: List[Ticker]
+    # T = formation period en días de trading (default 6 meses ≈ 126)
+    formation_days: int = Field(default=126, ge=21, le=504)
+    # S = skip period en días — convención común: skipear el último mes
+    # para evitar el short-term reversal effect (Jegadeesh-Titman).
+    skip_days: int = Field(default=21, ge=0, le=63)
+    # Si True, ajusta por volatilidad: rank por R_mean / sigma en vez de R_cum.
+    risk_adjusted: bool = Field(default=False)
