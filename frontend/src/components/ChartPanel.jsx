@@ -218,7 +218,7 @@ export default function ChartPanel({ data, signals, loading }) {
                 setWindow({ start: startIndex, end: endIndex })
               }
             }}
-            tickFormatter={fmt.date}
+            tickFormatter={fmt.dateY}
           >
             <LineChart>
               <Line
