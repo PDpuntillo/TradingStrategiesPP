@@ -4,11 +4,15 @@ import TickerLane from '../components/TickerLane'
 import PortfolioOptimizer from '../components/PortfolioOptimizer'
 import StrategySelector from '../components/StrategySelector'
 import { useTickers } from '../hooks/useTickers'
+import { useLaneConfig } from '../hooks/useLaneConfig'
 import styles from './Dashboard.module.css'
 
 export default function Dashboard() {
   // Tickers disponibles (cargados del backend, dinámicos)
   const { data: tickers, loading: tickersLoading, error: tickersError, refetch: refetchTickers } = useTickers()
+
+  // Visibilidad y orden de las lanes — persistido en localStorage
+  const laneConfig = useLaneConfig(tickers ?? [])
 
   // Ticker seleccionado en header (visual, no filtra lanes)
   const [selectedTicker, setSelectedTicker] = useState(null)
@@ -34,6 +38,7 @@ export default function Dashboard() {
         onSelectTicker={setSelectedTicker}
         lastUpdated={new Date().toISOString()}
         onTickerAdded={refetchTickers}
+        laneConfig={laneConfig}
       />
 
       <main className={styles.main}>
@@ -49,7 +54,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {(tickers ?? []).map((t) => (
+        {/* Solo renderear lanes visibles, en el orden custom del usuario */}
+        {laneConfig.visibleOrdered.map((t) => (
           <TickerLane
             key={t.ticker}
             ticker={t.ticker}

@@ -73,6 +73,23 @@
   border-style: solid;
 }
 
+.cogBtn {
+  margin-left: var(--s-1);
+  padding: var(--s-1) var(--s-3);
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 600;
+  font-size: var(--fs-micro);
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.cogBtn:hover {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
+}
+
 .right {
   margin-left: auto;
   display: flex;

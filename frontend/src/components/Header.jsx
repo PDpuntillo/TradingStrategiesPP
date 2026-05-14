@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fmt } from '../lib/format'
 import { api } from '../lib/api'
 import AddTickerModal from './AddTickerModal'
+import LaneConfigPanel from './LaneConfigPanel'
 import styles from './Header.module.css'
 
 /*
@@ -14,9 +15,17 @@ import styles from './Header.module.css'
  *   onSelectTicker: (ticker) => void
  *   lastUpdated: ISO string
  */
-export default function Header({ tickers = [], selectedTicker, onSelectTicker, lastUpdated, onTickerAdded }) {
+export default function Header({
+  tickers = [],
+  selectedTicker,
+  onSelectTicker,
+  lastUpdated,
+  onTickerAdded,
+  laneConfig,         // { config, toggleVisible, showAll, hideAll, moveTicker, resetOrder }
+}) {
   const [clearing, setClearing] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [laneConfigOpen, setLaneConfigOpen] = useState(false)
 
   // Tick cada 30s para refrescar el "ahora" del clock derecho
   const [now, setNow] = useState(() => new Date())
@@ -73,6 +82,16 @@ export default function Header({ tickers = [], selectedTicker, onSelectTicker, l
         >
           + ADD
         </button>
+        {laneConfig && (
+          <button
+            type="button"
+            className={styles.cogBtn}
+            onClick={() => setLaneConfigOpen(true)}
+            title="Configurar lanes visibles y orden"
+          >
+            ⚙ {laneConfig.config.visible.length}/{laneConfig.config.order.length}
+          </button>
+        )}
       </nav>
 
       <AddTickerModal
@@ -80,6 +99,20 @@ export default function Header({ tickers = [], selectedTicker, onSelectTicker, l
         onClose={() => setAddOpen(false)}
         onSuccess={() => onTickerAdded?.()}
       />
+
+      {laneConfig && (
+        <LaneConfigPanel
+          open={laneConfigOpen}
+          onClose={() => setLaneConfigOpen(false)}
+          availableTickers={tickers}
+          config={laneConfig.config}
+          onToggle={laneConfig.toggleVisible}
+          onShowAll={laneConfig.showAll}
+          onHideAll={laneConfig.hideAll}
+          onMove={laneConfig.moveTicker}
+          onReset={laneConfig.resetOrder}
+        />
+      )}
 
       <div className={styles.right}>
         <span className={styles.label}>last fetch</span>
