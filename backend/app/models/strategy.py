@@ -241,3 +241,12 @@ class PriceMomentumInput(BaseModel):
     skip_days: int = Field(default=21, ge=0, le=63)
     # Si True, ajusta por volatilidad: rank por R_mean / sigma en vez de R_cum.
     risk_adjusted: bool = Field(default=False)
+
+
+class LowVolatilityInput(BaseModel):
+    """Input para Low Volatility Anomaly (paper #4)."""
+    tickers: List[Ticker]
+    # Ventana para estimar la volatilidad. 6-12 meses es el rango típico.
+    lookback_days: int = Field(default=126, ge=21, le=504)
+    # Si True, anualiza la vol (sqrt(252) * daily_std). Solo afecta el display.
+    annualized: bool = Field(default=True)

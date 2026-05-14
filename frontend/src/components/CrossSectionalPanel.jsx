@@ -23,8 +23,13 @@ const STRATS = [
     description: 'Rankea tickers por cumulative return en el período de formación, skippeando el último mes para evitar short-term reversal.',
     paperRef: 'paper #1',
   },
+  {
+    id: 'low_volatility',
+    label: 'LOW VOL',
+    description: 'Anomaly: portfolios de baja volatilidad tienden a outperformar en el largo plazo. Rankea ASC por vol realizada — top decile = LONG (baja vol).',
+    paperRef: 'paper #4',
+  },
   // Próximas en commits siguientes:
-  // { id: 'low_vol', ... },
   // { id: 'value', ... },
   // { id: 'multifactor', ... },
   // { id: 'pairs', ... },
@@ -85,6 +90,12 @@ export default function CrossSectionalPanel({ availableTickers = [] }) {
 
         {activeId === 'momentum' && (
           <PriceMomentumRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'low_volatility' && (
+          <LowVolatilityRunner
             tickers={selectedTickers}
             availableTickers={availableTickers}
           />
@@ -183,6 +194,72 @@ function PriceMomentumRunner({ tickers }) {
         <div className={styles.error}>{String(error.message ?? error)}</div>
       )}
 
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Low Volatility runner
+// ============================================
+function LowVolatilityRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('low_volatility')
+  const [lookback, setLookback] = useState(126)
+  const [annualized, setAnnualized] = useState(true)
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({
+      tickers,
+      lookback_days: lookback,
+      annualized,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.switchField}`}>
+          <label className={styles.lbl}>ANUALIZADA (×√252)</label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={annualized}
+            className={`${styles.switch} ${annualized ? styles.switchOn : ''}`}
+            onClick={() => setAnnualized((v) => !v)}
+          >
+            <span className={styles.switchKnob} />
+          </button>
+        </div>
+        <div /> {/* spacer en la grid 3 cols */}
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
       {data && <RankingTable data={data} />}
     </>
   )

@@ -31,6 +31,7 @@ from app.models.strategy import (
     PortfolioWeight,
     CrossRankingItem, CrossRankingOutput,
     PriceMomentumInput,
+    LowVolatilityInput,
 )
 
 
@@ -532,6 +533,62 @@ def price_momentum(
         strategy_name="price_momentum",
         description=f"Cumulative return last {formation}d, skip {skip}d"
                     + (" (risk-adjusted)" if params.risk_adjusted else ""),
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #4: LOW VOLATILITY ANOMALY
+# ============================================
+def low_volatility(
+    bars_by_ticker: dict,
+    params: LowVolatilityInput,
+) -> CrossRankingOutput:
+    """
+    Paper #4 — Low Volatility Anomaly.
+
+    Para cada ticker calcula la vol histórica de los daily returns sobre
+    `lookback_days`. Rankea ASCENDENTE (menor vol → mejor rank), porque
+    el "anomaly" es que low-vol stocks outperforman.
+
+    LONG el top decile (low-vol) / SHORT el bottom decile (high-vol).
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+    needed = params.lookback_days + 1
+    ann_factor = np.sqrt(252.0) if params.annualized else 1.0
+
+    for ticker, bars in bars_by_ticker.items():
+        if len(bars) < needed:
+            items.append(CrossRankingItem(
+                ticker=ticker, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+
+        closes = np.array([b.close for b in bars[-needed:]], dtype=float)
+        rets = np.diff(closes) / closes[:-1]
+        sigma = float(np.std(rets, ddof=1)) if len(rets) > 1 else 0.0
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=sigma * ann_factor,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    # Rankear ASCENDENTE: menor vol → mejor (rank 1)
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value)  # asc
+    _assign_deciles_and_signals(with_data)
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="low_volatility",
+        description=f"Realized {('annualized ' if params.annualized else '')}volatility last {params.lookback_days}d — anomaly: low-vol stocks outperform",
         items=final_items,
         n_tickers=len(with_data),
         n_skipped=n_skipped,

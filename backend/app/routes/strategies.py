@@ -16,13 +16,14 @@ from app.models.strategy import (
     Strategy14Input, Strategy14Output,
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
-    PriceMomentumInput, CrossRankingOutput,
+    PriceMomentumInput, LowVolatilityInput,
+    CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
 from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
-    price_momentum,
+    price_momentum, low_volatility,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -273,6 +274,32 @@ def run_price_momentum(
         bars_by_ticker[ticker] = data.bars
 
     return price_momentum(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #4: LOW VOLATILITY ANOMALY
+# ============================================
+@router.post("/cross/low_volatility", response_model=CrossRankingOutput)
+def run_low_volatility(
+    params: LowVolatilityInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by realized volatility (paper #4)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional low-vol requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    bars_by_ticker = {}
+    needed = params.lookback_days + 1
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+
+    return low_volatility(bars_by_ticker, params)
 
 
 # ============================================
