@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
   LineChart,
@@ -14,6 +14,16 @@ import AmberReadout from './AmberReadout'
 import { fmt } from '../lib/format'
 import styles from './ChartPanel.module.css'
 
+// Períodos de visualización (en barras de trading, ~252 por año).
+const PERIODS = [
+  { key: '1M', label: '1M', bars: 21 },
+  { key: '3M', label: '3M', bars: 63 },
+  { key: '6M', label: '6M', bars: 126 },
+  { key: '1Y', label: '1Y', bars: 252 },
+  { key: '2Y', label: '2Y', bars: 504 },
+  { key: 'MAX', label: 'MAX', bars: Infinity },
+]
+
 /*
  * ChartPanel — precio + MAs + bandas (Donchian) + pivot.
  *
@@ -23,29 +33,36 @@ import styles from './ChartPanel.module.css'
  * Convención de terminal: eje Y a la DERECHA, grid casi invisible.
  */
 export default function ChartPanel({ data, signals, loading }) {
+  const [period, setPeriod] = useState('6M')
+
   const series = useMemo(() => {
     if (!data?.bars) return []
 
-    // Calculo MAs in-place (cheap, evitamos otro endpoint).
+    // Calculo MAs sobre TODA la serie (preciso desde el primer bar visible).
     const closes = data.bars.map((b) => b.close)
-    const ma = (period) => (idx) => {
-      if (idx < period - 1) return null
+    const ma = (mp) => (idx) => {
+      if (idx < mp - 1) return null
       let s = 0
-      for (let i = idx - period + 1; i <= idx; i++) s += closes[i]
-      return s / period
+      for (let i = idx - mp + 1; i <= idx; i++) s += closes[i]
+      return s / mp
     }
     const ma1 = ma(10)
     const ma2 = ma(20)
     const ma3 = ma(50)
 
-    return data.bars.map((b, i) => ({
+    const all = data.bars.map((b, i) => ({
       ts: b.timestamp,
       close: b.close,
       MA10: ma1(i),
       MA20: ma2(i),
       MA50: ma3(i),
     }))
-  }, [data])
+
+    // Slice según período seleccionado (desde la última barra hacia atrás).
+    const periodCfg = PERIODS.find((p) => p.key === period) ?? PERIODS[2]
+    if (periodCfg.bars === Infinity) return all
+    return all.slice(-periodCfg.bars)
+  }, [data, period])
 
   // Bandas Donchian (S15) y pivots (S14) como ReferenceLines horizontales
   const channel = signals?.strategy_15
@@ -60,6 +77,18 @@ export default function ChartPanel({ data, signals, loading }) {
 
   return (
     <div className={styles.chart}>
+      <div className={styles.periodBar}>
+        {PERIODS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            className={`${styles.periodBtn} ${p.key === period ? styles.periodBtnActive : ''}`}
+            onClick={() => setPeriod(p.key)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <CartesianGrid stroke="var(--overlay-grid)" strokeDasharray="0" vertical={false} />

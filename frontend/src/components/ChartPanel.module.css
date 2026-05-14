@@ -4,6 +4,35 @@
   background: var(--bg-elev-1);
   padding: var(--s-2);
   border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.periodBar {
+  display: flex;
+  gap: var(--s-1);
+  padding: 0 var(--s-2) var(--s-2);
+  flex-shrink: 0;
+}
+
+.periodBtn {
+  padding: 2px var(--s-2);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.periodBtn:hover {
+  color: var(--fg-primary);
+  border-color: var(--border);
+}
+
+.periodBtnActive {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
 }
 
 .empty {
