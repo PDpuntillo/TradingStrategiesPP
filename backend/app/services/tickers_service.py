@@ -189,15 +189,16 @@ def add_local_ticker(ticker: str, sheet_id_or_url: str) -> dict:
         # En prod, simulamos el merge para mostrarle qué quedaría
         full_map[t] = sid
 
-    # Snippet listo para pegar en el modal "Add from .env" de Render.
-    # Formato KEY='value' (single quotes para tolerar las " del JSON).
-    snippet_json = json.dumps(full_map, separators=(",", ":"))
-    snippet_envline = f"SHEET_IDS_JSON='{snippet_json}'"
+    # Snippet listo para pegar en Render. Formato simple KEY=VALUE
+    # (lo que Render acepta directo en el modal "Add from .env" o en
+    # el form key/value sin necesidad de quoting).
+    snippet_envline = f"SPREADSHEET_ID_{t}={sid}"
 
     return {
         "ticker": t,
         "sheet_id": sid,
         "persisted_locally": writable,
-        "snippet_for_prod": snippet_envline,
-        "snippet_json_only": snippet_json,
+        "snippet_for_prod": snippet_envline,   # SPREADSHEET_ID_TXAR=hilodenumeros
+        "render_key": f"SPREADSHEET_ID_{t}",   # para el form key/value
+        "render_value": sid,                   # para el campo VALUE
     }

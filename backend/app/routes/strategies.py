@@ -73,8 +73,9 @@ class AddTickerOutput(BaseModel):
     ticker: str
     sheet_id: str
     persisted_locally: bool
-    snippet_for_prod: str   # línea entera SHEET_IDS_JSON='...' lista para .env / Render
-    snippet_json_only: str  # solo el valor JSON, para pegar en el campo VALUE de Render UI
+    snippet_for_prod: str   # SPREADSHEET_ID_<TICKER>=<sheet_id> — pasteable en "Add from .env"
+    render_key: str         # para el form key/value de Render: este va al field KEY
+    render_value: str       # para el form key/value de Render: este va al field VALUE
 
 
 @router.post("/tickers/add", response_model=AddTickerOutput)

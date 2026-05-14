@@ -162,12 +162,22 @@ export default function AddTickerModal({ open, onClose, onSuccess }) {
 
             <div className={styles.snippetBox}>
               <div className={styles.snippetLabel}>
-                <span>OPCIÓN B · pegar en el campo VALUE (key = SHEET_IDS_JSON)</span>
-                <button type="button" className={styles.copyBtn} onClick={() => copy(result.snippet_json_only)}>
-                  ⧉ Copiar
+                <span>OPCIÓN B · agregar como env var individual en el form key/value</span>
+              </div>
+              <div className={styles.kvRow}>
+                <span className={styles.kvLbl}>KEY</span>
+                <code className={styles.kvVal}>{result.render_key}</code>
+                <button type="button" className={styles.copyBtn} onClick={() => copy(result.render_key)}>
+                  ⧉
                 </button>
               </div>
-              <pre className={styles.snippet}>{result.snippet_json_only}</pre>
+              <div className={styles.kvRow}>
+                <span className={styles.kvLbl}>VALUE</span>
+                <code className={styles.kvVal}>{result.render_value}</code>
+                <button type="button" className={styles.copyBtn} onClick={() => copy(result.render_value)}>
+                  ⧉
+                </button>
+              </div>
             </div>
 
             <div className={styles.actions}>
