@@ -1,44 +1,61 @@
-.overlay {
-  position: fixed;
+/*
+ * StrategyTogglePanel — drawer CONTEXTUAL a la lane. Vive dentro de
+ * ConsensusRail que renderea en el .body de TickerLane. Se posiciona
+ * absoluto desde el borde izquierdo, ocupa la altura del lane body.
+ * Sin overlay backdrop.
+ */
+/* Click-catcher transparente */
+.localOverlay {
+  position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 50;
+  z-index: 4;
+  cursor: default;
 }
 
 .panel {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
-  width: 360px;
-  background: var(--bg-elev-2);
-  border-right: 1px solid var(--border-emph);
+  width: 400px;
+  max-width: 100%;
+  background: var(--bg-card);
+  box-shadow:
+    14px 0 32px rgba(0, 0, 0, 0.28),
+    6px 0 12px rgba(0, 0, 0, 0.15),
+    inset -1px 0 0 rgba(0, 0, 0, 0.20);
   display: flex;
   flex-direction: column;
-  z-index: 51;
+  z-index: 5;
   overflow-y: auto;
+  animation: drawer-slide-left var(--anim-drawer) var(--ease-out-back);
 }
 
 .head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--grad-toolbar);
   border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .eyebrow {
   font-size: var(--fs-micro);
-  color: var(--accent-amber);
+  color: var(--accent-blue);
   letter-spacing: var(--tracking-wide);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .title {
   font-size: var(--fs-md);
   color: var(--fg-primary);
-  font-weight: 600;
-  margin-top: var(--s-1);
+  font-weight: var(--weight-semibold);
+  margin-top: 2px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .close {
@@ -46,40 +63,43 @@
   font-size: var(--fs-xl);
   line-height: 1;
   padding: 0 var(--s-2);
-  transition: color var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .close:hover {
-  color: var(--accent-amber);
+  color: var(--accent-blue);
 }
 
 .bulkBar {
   display: flex;
   gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
+  padding: var(--s-2) var(--s-4);
+  background: var(--bg-card-soft);
   border-bottom: 1px solid var(--border-soft);
 }
 
 .bulkBtn {
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  border-radius: var(--r-md);
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  font-weight: var(--weight-semibold);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-aqua-btn);
 }
 
-.bulkBtn:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
-}
+.bulkBtn:hover { filter: brightness(1.04); }
+.bulkBtn:active { box-shadow: var(--shadow-aqua-btn-active); }
 
 .list {
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: var(--bg-card);
+  overflow-y: auto;
 }
 
 .row {
@@ -87,43 +107,45 @@
   grid-template-columns: 24px 32px 40px 1fr;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-3) var(--s-4);
+  padding: var(--s-2) var(--s-4);
   text-align: left;
   border-bottom: 1px solid var(--border-soft);
   transition: background var(--t-fast) var(--ease);
 }
 
 .row:hover {
-  background: var(--bg-elev-3);
+  background: rgba(59, 125, 216, 0.06);
 }
 
 .rowOn {
-  background: rgba(255, 176, 0, 0.06);
+  background: rgba(59, 125, 216, 0.10);
 }
 
 .rowOn:hover {
-  background: rgba(255, 176, 0, 0.10);
+  background: rgba(59, 125, 216, 0.15);
 }
 
 .check {
   font-size: var(--fs-md);
   color: var(--fg-tertiary);
+  font-weight: var(--weight-bold);
 }
 
 .rowOn .check {
-  color: var(--accent-amber);
+  color: var(--accent-blue);
 }
 
 .num {
   font-size: var(--fs-micro);
   color: var(--fg-tertiary);
   letter-spacing: var(--tracking-wide);
+  font-weight: var(--weight-semibold);
 }
 
 .short {
   font-size: var(--fs-xs);
   color: var(--fg-secondary);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
 }
 
@@ -133,15 +155,14 @@
 }
 
 .foot {
-  padding: var(--s-3) var(--s-4);
-  border-top: 1px solid var(--border);
-  background: var(--bg-elev-1);
+  padding: var(--s-2) var(--s-4);
+  background: var(--bg-card-soft);
+  border-top: 1px solid var(--border-soft);
 }
 
 .note {
   font-size: var(--fs-micro);
   color: var(--fg-tertiary);
   letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
   line-height: 1.5;
 }

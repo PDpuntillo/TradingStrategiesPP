@@ -29,6 +29,15 @@ from app.models.strategy import (
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
     PortfolioWeight,
+    CrossRankingItem, CrossRankingOutput,
+    PriceMomentumInput,
+    LowVolatilityInput,
+    ValueInput,
+    MultifactorInput,
+    PairsInput,
+    PairsPosition, PairsOutput,
+    MeanReversionInput,
+    MeanReversionPosition, MeanReversionOutput,
 )
 
 
@@ -408,6 +417,576 @@ def strategy_18(
         sharpe_ratio=sharpe_ratio,
         dollar_neutral=params.dollar_neutral,
         total_investment=params.total_investment,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL HELPERS
+# ============================================
+def _assign_deciles_and_signals(items_sorted_desc: List[CrossRankingItem]) -> None:
+    """
+    Asigna decile (1..10) y signal (LONG/SHORT/HOLD) in-place.
+    Asume items ordenados descendentemente por factor (1 = mejor).
+
+    - Decile 1 (top 10%) → LONG
+    - Decile 10 (bottom 10%) → SHORT
+    - Resto → HOLD
+
+    Si hay <10 tickers, usa quintiles: top 20% LONG, bottom 20% SHORT.
+    Si hay <5, top 1 LONG, bottom 1 SHORT, resto HOLD.
+    """
+    n = len(items_sorted_desc)
+    if n == 0:
+        return
+
+    if n >= 10:
+        size = max(1, n // 10)  # ~10% por decile
+        long_cutoff = size
+        short_cutoff = n - size
+    elif n >= 5:
+        size = max(1, n // 5)
+        long_cutoff = size
+        short_cutoff = n - size
+    else:
+        long_cutoff = 1
+        short_cutoff = n - 1
+
+    for i, item in enumerate(items_sorted_desc):
+        item.rank = i + 1
+        # decile aproximado para todos
+        item.decile = min(10, int(10 * i / n) + 1)
+        if i < long_cutoff:
+            item.signal = SignalType.LONG
+        elif i >= short_cutoff:
+            item.signal = SignalType.SHORT
+        else:
+            item.signal = SignalType.HOLD
+
+
+# ============================================
+# CROSS-SECTIONAL #1: PRICE MOMENTUM
+# ============================================
+def price_momentum(
+    bars_by_ticker: dict,
+    params: PriceMomentumInput,
+) -> CrossRankingOutput:
+    """
+    Paper #1 — Price Momentum.
+
+    Para cada ticker calcula el cumulative return de los últimos T días,
+    skippeando los últimos S días (Jegadeesh-Titman convention para evitar
+    short-term reversal).
+
+    Si risk_adjusted=True, divide por la volatilidad del período (Sharpe-like).
+
+    Rankea descendentemente (mayor return → mayor rank → top decile = LONG).
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+
+    formation = params.formation_days
+    skip = params.skip_days
+    needed = formation + skip + 1  # bars necesarios
+
+    for ticker, bars in bars_by_ticker.items():
+        if len(bars) < needed:
+            items.append(CrossRankingItem(
+                ticker=ticker,
+                factor_value=None,
+                rank=None,
+                decile=None,
+                signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+
+        closes = np.array([b.close for b in bars], dtype=float)
+        # Ventana: hasta el bar -skip (exclusivo), formation bars hacia atrás.
+        end_idx = len(closes) - skip
+        start_idx = end_idx - formation
+        # Cumulative return entre start y end-1
+        p_start = closes[start_idx]
+        p_end = closes[end_idx - 1]
+        cum_return = (p_end / p_start) - 1.0 if p_start > 0 else 0.0
+
+        if params.risk_adjusted:
+            window = closes[start_idx:end_idx]
+            rets = np.diff(window) / window[:-1]
+            sigma = float(np.std(rets, ddof=1)) if len(rets) > 1 else 0.0
+            factor = (cum_return / sigma) if sigma > 0 else 0.0
+        else:
+            factor = cum_return
+
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=float(factor),
+            rank=None,
+            decile=None,
+            signal=SignalType.HOLD,
+        ))
+
+    # Separar los con data y sin data, rankear solo los válidos
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value, reverse=True)  # desc
+    _assign_deciles_and_signals(with_data)
+
+    # Devolver: primero los rankeados, después los skippeados
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="price_momentum",
+        description=f"Cumulative return last {formation}d, skip {skip}d"
+                    + (" (risk-adjusted)" if params.risk_adjusted else ""),
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #4: LOW VOLATILITY ANOMALY
+# ============================================
+def low_volatility(
+    bars_by_ticker: dict,
+    params: LowVolatilityInput,
+) -> CrossRankingOutput:
+    """
+    Paper #4 — Low Volatility Anomaly.
+
+    Para cada ticker calcula la vol histórica de los daily returns sobre
+    `lookback_days`. Rankea ASCENDENTE (menor vol → mejor rank), porque
+    el "anomaly" es que low-vol stocks outperforman.
+
+    LONG el top decile (low-vol) / SHORT el bottom decile (high-vol).
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+    needed = params.lookback_days + 1
+    ann_factor = np.sqrt(252.0) if params.annualized else 1.0
+
+    for ticker, bars in bars_by_ticker.items():
+        if len(bars) < needed:
+            items.append(CrossRankingItem(
+                ticker=ticker, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+
+        closes = np.array([b.close for b in bars[-needed:]], dtype=float)
+        rets = np.diff(closes) / closes[:-1]
+        sigma = float(np.std(rets, ddof=1)) if len(rets) > 1 else 0.0
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=sigma * ann_factor,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    # Rankear ASCENDENTE: menor vol → mejor (rank 1)
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value)  # asc
+    _assign_deciles_and_signals(with_data)
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="low_volatility",
+        description=f"Realized {('annualized ' if params.annualized else '')}volatility last {params.lookback_days}d — anomaly: low-vol stocks outperform",
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #3: VALUE (B/P)
+# ============================================
+def value_strategy(
+    fundamentals_by_ticker: dict,
+    prices_by_ticker: dict,
+    params: ValueInput,
+) -> CrossRankingOutput:
+    """
+    Paper #3 — Value.
+
+    Factor: B/P = BookValuePerShare / current_price.
+
+    Rankea descendente (mayor B/P → ticker más "value/cheap" → top decile
+    = LONG, bottom = SHORT). Tickers sin BookValuePerShare en su
+    FUNDAMENTALS sheet aparecen como skipped.
+
+    fundamentals_by_ticker: {ticker: {metric: value}}
+    prices_by_ticker:       {ticker: last_close_float}
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+
+    for ticker, price in prices_by_ticker.items():
+        fundamentals = fundamentals_by_ticker.get(ticker, {})
+        book = fundamentals.get(params.book_value_metric)
+        if book is None or price is None or price <= 0:
+            items.append(CrossRankingItem(
+                ticker=ticker, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+        bp_ratio = float(book) / float(price)
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=bp_ratio,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value, reverse=True)  # desc
+    _assign_deciles_and_signals(with_data)
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="value",
+        description=f"B/P ratio = {params.book_value_metric} / current_price — top decile = LONG (más value)",
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #6: MULTIFACTOR
+# ============================================
+def multifactor(
+    bars_by_ticker: dict,
+    fundamentals_by_ticker: dict,
+    prices_by_ticker: dict,
+    params: MultifactorInput,
+) -> CrossRankingOutput:
+    """
+    Paper #6 — Multifactor portfolio.
+
+    Combina los rankings de momentum, low-vol y value en un score promedio:
+      s_Ai = rank(f_Ai) / N           (rank normalizado a [0,1], 0=mejor)
+      s_i  = (1/F) * sum_A(s_Ai)      (promedio cross-factor)
+
+    Rankea ASC por s_i (menor score = mejor combined rank = top decile = LONG).
+
+    Sub-strategies enabled/disabled vía params.include_*.
+    """
+    tickers = list(bars_by_ticker.keys())
+    sub_outputs: dict = {}
+
+    if params.include_momentum:
+        sub_outputs["momentum"] = price_momentum(
+            bars_by_ticker,
+            PriceMomentumInput(
+                tickers=tickers,
+                formation_days=params.momentum_formation_days,
+                skip_days=params.momentum_skip_days,
+            ),
+        )
+    if params.include_low_volatility:
+        sub_outputs["low_volatility"] = low_volatility(
+            bars_by_ticker,
+            LowVolatilityInput(
+                tickers=tickers,
+                lookback_days=params.lowvol_lookback_days,
+            ),
+        )
+    if params.include_value:
+        sub_outputs["value"] = value_strategy(
+            fundamentals_by_ticker,
+            prices_by_ticker,
+            ValueInput(tickers=tickers),
+        )
+
+    if not sub_outputs:
+        # Edge case: el user deshabilitó todos
+        return CrossRankingOutput(
+            strategy_name="multifactor",
+            description="No factors enabled",
+            items=[CrossRankingItem(
+                ticker=t, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ) for t in tickers],
+            n_tickers=0,
+            n_skipped=len(tickers),
+            timestamp=datetime.now(),
+        )
+
+    # Combinar: para cada ticker, promedio de ranks normalizados a [0,1]
+    # (0 = top, 1 = bottom).
+    combined: dict = {}
+    for ticker in tickers:
+        normalized_ranks = []
+        for sub_name, sub_out in sub_outputs.items():
+            sub_item = next(
+                (x for x in sub_out.items if x.ticker == ticker), None
+            )
+            if sub_item is None or sub_item.rank is None:
+                continue
+            n = sub_out.n_tickers
+            if n <= 1:
+                normalized_ranks.append(0.0)
+            else:
+                normalized_ranks.append((sub_item.rank - 1) / (n - 1))
+        # Necesitamos al menos 1 sub-strategy con dato para incluir este ticker
+        if normalized_ranks:
+            combined[ticker] = sum(normalized_ranks) / len(normalized_ranks)
+
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+    for ticker in tickers:
+        score = combined.get(ticker)
+        if score is None:
+            n_skipped += 1
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=score,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value)  # asc — menor score = mejor
+    _assign_deciles_and_signals(with_data)
+
+    enabled = ", ".join(sub_outputs.keys())
+    return CrossRankingOutput(
+        strategy_name="multifactor",
+        description=f"Combined rank score across {len(sub_outputs)} factors: {enabled}",
+        items=with_data + without_data,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #8: PAIRS TRADING
+# ============================================
+def pairs_trading(
+    bars_a: List[PriceBar],
+    bars_b: List[PriceBar],
+    params: PairsInput,
+) -> PairsOutput:
+    """
+    Paper #8 — Pairs Trading.
+
+    Idea: dos tickers históricamente correlacionados deberían moverse
+    juntos. Cuando uno overperforma vs el promedio del par, está "rich"
+    y se shortea; el otro está "cheap" y se compra. Dollar-neutral.
+
+    Formulas:
+        R_A = ln(P_A_t2 / P_A_t1)        log return de A sobre la ventana
+        R_B = ln(P_B_t2 / P_B_t1)        log return de B
+        R_mean = (R_A + R_B) / 2         media del par
+        R_tilde_A = R_A - R_mean         demeaned return de A
+        R_tilde_B = R_B - R_mean = -R_tilde_A
+
+    Signal: R_tilde > 0 → ticker está "rich" → SHORT
+            R_tilde < 0 → ticker está "cheap" → LONG
+
+    La correlación (Pearson) del par sobre la ventana se devuelve como
+    contexto — pares con correlation > 0.7 son los típicamente usables.
+    """
+    needed = params.lookback_days + 1
+    if len(bars_a) < needed or len(bars_b) < needed:
+        raise ValueError(
+            f"Necesito al menos {needed} bars de ambos tickers"
+        )
+
+    closes_a = np.array([b.close for b in bars_a[-needed:]], dtype=float)
+    closes_b = np.array([b.close for b in bars_b[-needed:]], dtype=float)
+
+    # Log returns sobre la ventana completa: end / start
+    R_A = float(np.log(closes_a[-1] / closes_a[0]))
+    R_B = float(np.log(closes_b[-1] / closes_b[0]))
+    R_mean = (R_A + R_B) / 2
+    R_tilde_A = R_A - R_mean
+    R_tilde_B = R_B - R_mean
+
+    # Correlación de los daily returns (contexto, no la usamos para la signal)
+    daily_a = np.diff(closes_a) / closes_a[:-1]
+    daily_b = np.diff(closes_b) / closes_b[:-1]
+    correlation = float(np.corrcoef(daily_a, daily_b)[0, 1]) if len(daily_a) > 1 else 0.0
+
+    # Dollar positions: half del investment por lado, signo según demeaned
+    half = params.total_investment / 2
+    pos_a = -half if R_tilde_A > 0 else (half if R_tilde_A < 0 else 0.0)
+    pos_b = -half if R_tilde_B > 0 else (half if R_tilde_B < 0 else 0.0)
+
+    def _signal(rt: float) -> SignalType:
+        if rt > 0.001:
+            return SignalType.SHORT
+        if rt < -0.001:
+            return SignalType.LONG
+        return SignalType.HOLD
+
+    positions = [
+        PairsPosition(
+            ticker=params.ticker_a,
+            log_return=R_A,
+            demeaned_return=R_tilde_A,
+            dollar_position=pos_a,
+            signal=_signal(R_tilde_A),
+        ),
+        PairsPosition(
+            ticker=params.ticker_b,
+            log_return=R_B,
+            demeaned_return=R_tilde_B,
+            dollar_position=pos_b,
+            signal=_signal(R_tilde_B),
+        ),
+    ]
+
+    return PairsOutput(
+        strategy_name="pairs_trading",
+        ticker_a=params.ticker_a,
+        ticker_b=params.ticker_b,
+        correlation=correlation,
+        lookback_days=params.lookback_days,
+        mean_return=R_mean,
+        positions=positions,
+        total_investment=params.total_investment,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #9/#10: MEAN REVERSION (single + multiple clusters)
+# ============================================
+def mean_reversion(
+    bars_by_ticker: dict,
+    sectors_by_ticker: dict,         # {ticker: sector_name or None}
+    params: MeanReversionInput,
+) -> MeanReversionOutput:
+    """
+    Paper #9 (single cluster) / #10 (multiple clusters) — Mean Reversion.
+
+    Para un cluster (set de tickers correlacionados, ej. mismo sector):
+        R_i           = log return de i sobre la ventana
+        R_mean        = (1/N) * sum(R_i)
+        R_tilde_i     = R_i - R_mean             (demeaned)
+        gamma         = I_cluster / sum(|R_tilde_i|)
+        D_i           = -gamma * R_tilde_i        (posición en dólares)
+
+    El signo negativo es la "reversion": shortemos los que subieron más
+    que el cluster mean, longemos los que subieron menos. Cuando converjan
+    al mean, hacemos profit.
+
+    use_clusters=False → un cluster con todos los tickers (paper #9)
+    use_clusters=True  → grupos por sector de tickers_meta.json (paper #10)
+
+    La inversión se reparte equally entre los clusters non-empty.
+    """
+    # Construir clusters
+    if params.use_clusters:
+        clusters: dict = {}  # cluster_name → [ticker, ...]
+        for ticker in bars_by_ticker.keys():
+            sector = sectors_by_ticker.get(ticker) or "Sin clasificar"
+            clusters.setdefault(sector, []).append(ticker)
+    else:
+        clusters = {None: list(bars_by_ticker.keys())}
+
+    needed = params.lookback_days + 1
+    positions: List[MeanReversionPosition] = []
+    n_skipped = 0
+    # Solo contamos los clusters con >=2 tickers usables para repartir investment
+    usable_clusters = []
+    cluster_returns: dict = {}  # cluster_name → {ticker: log_return}
+
+    for cluster_name, cluster_tickers in clusters.items():
+        returns: dict = {}
+        for t in cluster_tickers:
+            bars = bars_by_ticker.get(t, [])
+            if len(bars) < needed:
+                continue
+            closes = np.array([b.close for b in bars[-needed:]], dtype=float)
+            if closes[0] <= 0:
+                continue
+            returns[t] = float(np.log(closes[-1] / closes[0]))
+        cluster_returns[cluster_name] = returns
+        if len(returns) >= 2:
+            usable_clusters.append(cluster_name)
+
+    investment_per_cluster = (
+        params.total_investment / len(usable_clusters) if usable_clusters else 0.0
+    )
+
+    for cluster_name, cluster_tickers in clusters.items():
+        returns = cluster_returns[cluster_name]
+        if len(returns) < 2:
+            # cluster muy chico — todos HOLD
+            for t in cluster_tickers:
+                if t in returns:
+                    positions.append(MeanReversionPosition(
+                        ticker=t, cluster=cluster_name,
+                        log_return=returns[t],
+                        demeaned_return=0.0,
+                        dollar_position=0.0,
+                        signal=SignalType.HOLD,
+                    ))
+                else:
+                    n_skipped += 1
+                    positions.append(MeanReversionPosition(
+                        ticker=t, cluster=cluster_name,
+                        log_return=0.0,
+                        demeaned_return=0.0,
+                        dollar_position=0.0,
+                        signal=SignalType.HOLD,
+                    ))
+            continue
+
+        mean_R = sum(returns.values()) / len(returns)
+        demeaned = {t: R - mean_R for t, R in returns.items()}
+        abs_sum = sum(abs(d) for d in demeaned.values())
+        gamma = investment_per_cluster / abs_sum if abs_sum > 0 else 0.0
+
+        for t in cluster_tickers:
+            if t not in returns:
+                n_skipped += 1
+                positions.append(MeanReversionPosition(
+                    ticker=t, cluster=cluster_name,
+                    log_return=0.0, demeaned_return=0.0,
+                    dollar_position=0.0, signal=SignalType.HOLD,
+                ))
+                continue
+            rt = demeaned[t]
+            pos = -gamma * rt  # NEGATIVE: shortemos los outperformers
+            if pos > 0.01:
+                sig = SignalType.LONG
+            elif pos < -0.01:
+                sig = SignalType.SHORT
+            else:
+                sig = SignalType.HOLD
+            positions.append(MeanReversionPosition(
+                ticker=t, cluster=cluster_name,
+                log_return=returns[t],
+                demeaned_return=rt,
+                dollar_position=pos,
+                signal=sig,
+            ))
+
+    # Ordenar: por cluster, dentro de cada cluster por dollar_position desc
+    positions.sort(key=lambda p: (p.cluster or "", -p.dollar_position))
+
+    n_tickers = sum(1 for p in positions if p.dollar_position != 0.0)
+
+    return MeanReversionOutput(
+        strategy_name="mean_reversion",
+        use_clusters=params.use_clusters,
+        n_clusters=len(usable_clusters),
+        n_tickers=n_tickers,
+        n_skipped=n_skipped,
+        lookback_days=params.lookback_days,
+        total_investment=params.total_investment,
+        positions=positions,
         timestamp=datetime.now(),
     )
 

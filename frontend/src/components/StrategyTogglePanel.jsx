@@ -21,7 +21,7 @@ export default function StrategyTogglePanel({
 
   return (
     <>
-      <div className={styles.overlay} onClick={onClose} aria-hidden />
+      <div className={styles.localOverlay} onClick={onClose} aria-hidden />
       <aside className={styles.panel} role="dialog" aria-label="Toggle strategies">
         <header className={styles.head}>
           <div>

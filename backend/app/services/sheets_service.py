@@ -87,7 +87,8 @@ class SheetsService:
         ticker: Ticker,
         sheet_name: str,
         cell_range: str,
-    ) -> List[List[str]]:
+        unformatted: bool = False,
+    ) -> List[List]:
         """
         Lee un rango de celdas de una sheet.
 
@@ -95,12 +96,22 @@ class SheetsService:
             ticker: Ticker que mapea al spreadsheet
             sheet_name: Nombre de la pestaña (ej: "RAW_DATA")
             cell_range: Rango A1 (ej: "A2:G500")
+            unformatted: Si True, Google devuelve valores RAW (numbers como
+                         floats, no strings con formato local). Necesario para
+                         FUNDAMENTALS donde el user puede tener "4,835.19" con
+                         coma de miles que float() no parsea. Default False
+                         (mantiene compat con RAW_DATA cuyo timestamp se parsea
+                         como string).
 
         Returns:
-            Lista de filas (cada fila es lista de strings)
+            Lista de filas. Cada celda puede ser str/int/float según
+            valueRenderOption.
         """
         ticker_key = ticker.upper() if isinstance(ticker, str) else str(ticker).upper()
-        cache_key = f"{ticker_key}:{sheet_name}:{cell_range}"
+        # Diferencio el cache por unformatted mode — datos crudos vs formateados
+        # producen valores distintos en la respuesta.
+        mode = "u" if unformatted else "f"
+        cache_key = f"{ticker_key}:{sheet_name}:{cell_range}:{mode}"
 
         # 1. Cache hit (fast path, sin lock)
         if cache_key in self._cache:
@@ -144,7 +155,13 @@ class SheetsService:
                 result = (
                     self.service.spreadsheets()
                     .values()
-                    .get(spreadsheetId=spreadsheet_id, range=full_range)
+                    .get(
+                        spreadsheetId=spreadsheet_id,
+                        range=full_range,
+                        valueRenderOption=(
+                            "UNFORMATTED_VALUE" if unformatted else "FORMATTED_VALUE"
+                        ),
+                    )
                     .execute()
                 )
             values = result.get("values", [])
@@ -218,6 +235,57 @@ class SheetsService:
             bars=bars,
             last_updated=datetime.now(),
         )
+
+    def get_fundamentals(self, ticker: Ticker) -> dict:
+        """
+        Lee la sheet FUNDAMENTALS del ticker (opcional, mantenida a mano).
+
+        Formato esperado:
+            Row 1: header (Metric, Value, AsOf) — skipeado
+            Row 2+: A=metric_name, B=value (numérico), C=as_of (string, opcional)
+
+        Returns dict {metric_name: float_value}. Si la sheet no existe,
+        devuelve dict vacío en vez de raisear (la estrategia que necesite
+        ese dato skipea el ticker en su ranking).
+
+        Usa unformatted=True así Google devuelve los números crudos
+        (sin formato local de miles/decimales que rompería float()).
+        """
+        try:
+            rows = self.read_range(ticker, "FUNDAMENTALS", "A2:C", unformatted=True)
+        except Exception as e:
+            logger.debug(f"FUNDAMENTALS no disponible para {ticker}: {e}")
+            return {}
+
+        result: dict = {}
+        for row in rows:
+            if len(row) < 2:
+                continue
+            metric_raw = row[0]
+            metric = (
+                metric_raw.strip() if isinstance(metric_raw, str)
+                else str(metric_raw).strip()
+            )
+            if not metric:
+                continue
+            value_raw = row[1]
+            # Con unformatted=True ya viene como int/float si era número;
+            # si por alguna razón llega como string, intentamos parsear
+            # tolerando comas (formato es-AR/EN).
+            try:
+                if isinstance(value_raw, (int, float)):
+                    result[metric] = float(value_raw)
+                elif isinstance(value_raw, str):
+                    cleaned = value_raw.strip().replace(",", "")
+                    if cleaned:
+                        result[metric] = float(cleaned)
+                # else: skipear (None u otros)
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"FUNDAMENTALS {ticker}: valor no numérico para '{metric}': {value_raw!r}"
+                )
+                continue
+        return result
 
     def get_strategy_sheet(
         self,

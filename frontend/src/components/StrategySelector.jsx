@@ -60,7 +60,7 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
 
   return (
     <>
-      <div className={styles.overlay} onClick={onClose} aria-hidden />
+      <div className={styles.localOverlay} onClick={onClose} aria-hidden />
       <aside className={styles.drawer} role="dialog" aria-label={`Strategy ${strategyNum}`}>
         <header className={styles.head}>
           <div>

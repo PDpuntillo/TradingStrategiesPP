@@ -1,0 +1,811 @@
+import { useEffect, useState } from 'react'
+import { useCrossStrategy } from '../hooks/useCrossStrategy'
+import { useAllTickers } from '../hooks/useTickers'
+import TickerPicker from './TickerPicker'
+import { fmt, signalColor, signalGlyph } from '../lib/format'
+import styles from './CrossSectionalPanel.module.css'
+
+/*
+ * CrossSectionalPanel — sección para ejecutar estrategias cross-sectional
+ * (que rankean tickers entre sí, en vez de generar signal per-ticker).
+ *
+ * Diseño: tabs arriba (una por estrategia), abajo el form de params
+ * + tabla de resultados con ranking, decile y signal por ticker.
+ *
+ * Por ahora soporta solo PRICE_MOMENTUM. El patrón se replica para las
+ * próximas (low_vol, value, multifactor, pairs, mr).
+ */
+
+const STRATS = [
+  {
+    id: 'momentum',
+    label: 'PRICE MOMENTUM',
+    description: 'Rankea tickers por cumulative return en el período de formación, skippeando el último mes para evitar short-term reversal.',
+    paperRef: 'paper #1',
+  },
+  {
+    id: 'low_volatility',
+    label: 'LOW VOL',
+    description: 'Anomaly: portfolios de baja volatilidad tienden a outperformar en el largo plazo. Rankea ASC por vol realizada — top decile = LONG (baja vol).',
+    paperRef: 'paper #4',
+  },
+  {
+    id: 'value',
+    label: 'VALUE (B/P)',
+    description: 'Rankea por B/P = BookValuePerShare / current_price. Top decile = LONG (más "cheap"). Requiere que cada ticker tenga la sheet FUNDAMENTALS con BookValuePerShare cargada a mano (ver docs).',
+    paperRef: 'paper #3',
+  },
+  {
+    id: 'multifactor',
+    label: 'MULTIFACTOR',
+    description: 'Combina momentum + low-vol + value en un score promedio de ranks. Top decile (menor score) = LONG.',
+    paperRef: 'paper #6',
+  },
+  {
+    id: 'pairs',
+    label: 'PAIRS',
+    description: 'Dos tickers correlacionados: cuando uno overperforma vs el promedio del par, está "rich" → SHORT, el otro "cheap" → LONG. Dollar-neutral.',
+    paperRef: 'paper #8',
+  },
+  {
+    id: 'mean_reversion',
+    label: 'MEAN REVERSION',
+    description: 'Generalización de pairs a N tickers correlacionados. Toggle "use clusters" para agrupar por sector (paper #10) en vez de un único cluster (paper #9). Shortemos los outperformers vs cluster mean, longemos los underperformers — esperando que reviertan.',
+    paperRef: 'paper #9 / #10',
+  },
+]
+
+export default function CrossSectionalPanel({ availableTickers = [] }) {
+  const [activeId, setActiveId] = useState('momentum')
+  const active = STRATS.find((s) => s.id === activeId) ?? STRATS[0]
+
+  const { data: allTickers } = useAllTickers()
+  const [selectedTickers, setSelectedTickers] = useState([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  // Default: todos los del dashboard
+  useEffect(() => {
+    if (selectedTickers.length === 0 && availableTickers.length > 0) {
+      setSelectedTickers(availableTickers.map((t) => t.ticker))
+    }
+  }, [availableTickers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <section className={styles.box}>
+      <header className={styles.head}>
+        <div>
+          <div className={styles.eyebrow}>CROSS-SECTIONAL STRATEGIES</div>
+          <div className={styles.title}>RANKING ENTRE TICKERS</div>
+        </div>
+        <button
+          type="button"
+          className={styles.cog}
+          onClick={() => setPickerOpen(true)}
+          title="Configurar universo de tickers"
+        >
+          ⚙ {selectedTickers.length} TICKERS
+        </button>
+      </header>
+
+      <div className={styles.tabs}>
+        {STRATS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={`${styles.tab} ${s.id === activeId ? styles.tabActive : ''}`}
+            onClick={() => setActiveId(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.body}>
+        <div className={styles.activeDesc}>
+          <span className={styles.paperRef}>{active.paperRef}</span>
+          {active.description}
+        </div>
+
+        {activeId === 'momentum' && (
+          <PriceMomentumRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'low_volatility' && (
+          <LowVolatilityRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'value' && (
+          <ValueRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'multifactor' && (
+          <MultifactorRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'pairs' && (
+          <PairsRunner availableTickers={availableTickers} />
+        )}
+        {activeId === 'mean_reversion' && (
+          <MeanReversionRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+      </div>
+
+      <TickerPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        allTickers={availableTickers.length > 0 ? availableTickers : (allTickers ?? [])}
+        selected={selectedTickers}
+        onChange={setSelectedTickers}
+      />
+    </section>
+  )
+}
+
+
+// ============================================
+// Sub-component: Price Momentum runner
+// ============================================
+function PriceMomentumRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('momentum')
+  const [formationDays, setFormationDays] = useState(126)
+  const [skipDays, setSkipDays] = useState(21)
+  const [riskAdjusted, setRiskAdjusted] = useState(false)
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({
+      tickers,
+      formation_days: formationDays,
+      skip_days: skipDays,
+      risk_adjusted: riskAdjusted,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            FORMATION (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={formationDays}
+            onChange={(e) => setFormationDays(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            SKIP (días) <span className={styles.bounds}>[0 — 63]</span>
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={63}
+            step={1}
+            value={skipDays}
+            onChange={(e) => setSkipDays(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.switchField}`}>
+          <label className={styles.lbl}>RISK ADJUSTED</label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={riskAdjusted}
+            className={`${styles.switch} ${riskAdjusted ? styles.switchOn : ''}`}
+            onClick={() => setRiskAdjusted((v) => !v)}
+          >
+            <span className={styles.switchKnob} />
+          </button>
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>
+          Seleccioná al menos 2 tickers para rankear.
+        </div>
+      )}
+
+      {error && (
+        <div className={styles.error}>{String(error.message ?? error)}</div>
+      )}
+
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Low Volatility runner
+// ============================================
+function LowVolatilityRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('low_volatility')
+  const [lookback, setLookback] = useState(126)
+  const [annualized, setAnnualized] = useState(true)
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({
+      tickers,
+      lookback_days: lookback,
+      annualized,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.switchField}`}>
+          <label className={styles.lbl}>ANUALIZADA (×√252)</label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={annualized}
+            className={`${styles.switch} ${annualized ? styles.switchOn : ''}`}
+            onClick={() => setAnnualized((v) => !v)}
+          >
+            <span className={styles.switchKnob} />
+          </button>
+        </div>
+        <div /> {/* spacer en la grid 3 cols */}
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Value runner
+// ============================================
+function ValueRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('value')
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({ tickers })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            FUENTE
+            <span className={styles.bounds}>FUNDAMENTALS!BookValuePerShare</span>
+          </label>
+          <div className={styles.notice}>
+            Cargá Book Value por ticker en la pestaña FUNDAMENTALS
+            (ver docs/google-sheets-setup.md sección "Value strategy").
+          </div>
+        </div>
+        <div /> <div /> {/* spacers para mantener la grid */}
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Multifactor runner
+// ============================================
+function MultifactorRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('multifactor')
+  const [includeMomentum, setIncludeMomentum] = useState(true)
+  const [includeLowVol, setIncludeLowVol] = useState(true)
+  const [includeValue, setIncludeValue] = useState(true)
+  const [momentumFormation, setMomentumFormation] = useState(126)
+  const [lowvolLookback, setLowvolLookback] = useState(126)
+
+  const enabledCount = [includeMomentum, includeLowVol, includeValue].filter(Boolean).length
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2 || enabledCount === 0) return
+    run({
+      tickers,
+      include_momentum: includeMomentum,
+      include_low_volatility: includeLowVol,
+      include_value: includeValue,
+      momentum_formation_days: momentumFormation,
+      momentum_skip_days: 21,
+      lowvol_lookback_days: lowvolLookback,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>FACTORES ACTIVOS <span className={styles.bounds}>{enabledCount}/3</span></label>
+          <div className={styles.factorChecks}>
+            <FactorCheck label="Momentum" on={includeMomentum} onToggle={() => setIncludeMomentum((v) => !v)} />
+            <FactorCheck label="Low Vol" on={includeLowVol} onToggle={() => setIncludeLowVol((v) => !v)} />
+            <FactorCheck label="Value" on={includeValue} onToggle={() => setIncludeValue((v) => !v)} />
+          </div>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            MOMENTUM FORMATION <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={momentumFormation}
+            onChange={(e) => setMomentumFormation(parseInt(e.target.value, 10))}
+            disabled={!includeMomentum}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOW-VOL LOOKBACK <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lowvolLookback}
+            onChange={(e) => setLowvolLookback(parseInt(e.target.value, 10))}
+            disabled={!includeLowVol}
+          />
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2 || enabledCount === 0}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {enabledCount === 0 && (
+        <div className={styles.warning}>Habilitá al menos 1 factor.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+function FactorCheck({ label, on, onToggle }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      className={`${styles.factorCheck} ${on ? styles.factorOn : ''}`}
+      onClick={onToggle}
+    >
+      {on ? '■' : '□'} {label}
+    </button>
+  )
+}
+
+
+// ============================================
+// Sub-component: Pairs Trading runner
+// ============================================
+function PairsRunner({ availableTickers }) {
+  const { data, loading, error, run } = useCrossStrategy('pairs')
+  const [tickerA, setTickerA] = useState('')
+  const [tickerB, setTickerB] = useState('')
+  const [lookback, setLookback] = useState(63)
+  const [investment, setInvestment] = useState(10000)
+
+  // Auto-seleccionar los primeros 2 cuando llega availableTickers
+  useEffect(() => {
+    if (!tickerA && availableTickers.length >= 1) setTickerA(availableTickers[0].ticker)
+    if (!tickerB && availableTickers.length >= 2) setTickerB(availableTickers[1].ticker)
+  }, [availableTickers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sameTicker = tickerA && tickerB && tickerA === tickerB
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (!tickerA || !tickerB || sameTicker) return
+    run({
+      ticker_a: tickerA,
+      ticker_b: tickerB,
+      lookback_days: lookback,
+      total_investment: investment,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>TICKER A</label>
+          <select value={tickerA} onChange={(e) => setTickerA(e.target.value)}>
+            {availableTickers.map((t) => (
+              <option key={t.ticker} value={t.ticker}>{t.ticker} · {t.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>TICKER B</label>
+          <select value={tickerB} onChange={(e) => setTickerB(e.target.value)}>
+            {availableTickers.map((t) => (
+              <option key={t.ticker} value={t.ticker}>{t.ticker} · {t.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || !tickerA || !tickerB || sameTicker}
+        >
+          {loading ? 'CALCULANDO…' : 'CALCULAR'}
+        </button>
+      </form>
+
+      <div className={styles.subForm}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            INVERSIÓN TOTAL <span className={styles.bounds}>(se divide 50/50)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            step="any"
+            value={investment}
+            onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
+          />
+        </div>
+      </div>
+
+      {sameTicker && (
+        <div className={styles.warning}>Ticker A y B deben ser distintos.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <PairsCard data={data} />}
+    </>
+  )
+}
+
+function PairsCard({ data }) {
+  const { ticker_a, ticker_b, correlation, lookback_days, mean_return, positions, total_investment, timestamp } = data
+
+  const corrColor =
+    Math.abs(correlation) >= 0.7 ? 'var(--sig-long)' :
+    Math.abs(correlation) >= 0.4 ? 'var(--accent-amber)' :
+    'var(--sig-short)'
+
+  return (
+    <div className={styles.pairsResult}>
+      <div className={styles.pairsHeader}>
+        <div className={styles.pairsTitle}>
+          {ticker_a}.BA <span className={styles.pairsVs}>×</span> {ticker_b}.BA
+        </div>
+        <div className={styles.pairsMeta}>
+          <span>lookback {lookback_days}d</span>
+          <span>·</span>
+          <span>corr</span>
+          <span className="tabular" style={{ color: corrColor }}>
+            {fmt.ratio(correlation)}
+          </span>
+          <span>·</span>
+          <span>mean return</span>
+          <span className="tabular">{fmt.pct(mean_return)}</span>
+        </div>
+      </div>
+
+      <div className={styles.pairsPositions}>
+        {positions.map((p) => (
+          <div
+            key={p.ticker}
+            className={styles.pairsRow}
+            style={{ '--row-color': signalColor(p.signal) }}
+          >
+            <div className={styles.pairsTicker}>{p.ticker}.BA</div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>RETURN</div>
+              <div className={`${styles.pairsVal} tabular`}>{fmt.pct(p.log_return)}</div>
+            </div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>DEMEANED</div>
+              <div className={`${styles.pairsVal} tabular`}>{fmt.pct(p.demeaned_return)}</div>
+            </div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>POSITION</div>
+              <div className={`${styles.pairsVal} tabular`}>
+                {fmt.price(p.dollar_position)}
+              </div>
+            </div>
+            <div
+              className={styles.pairsSignal}
+              style={{ color: signalColor(p.signal) }}
+            >
+              {signalGlyph(p.signal)} {p.signal}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.resultMeta}>
+        total {fmt.price(total_investment)} · ts {fmt.ts(timestamp)}
+      </div>
+    </div>
+  )
+}
+
+
+// ============================================
+// Sub-component: Mean Reversion runner
+// ============================================
+function MeanReversionRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('mean_reversion')
+  const [lookback, setLookback] = useState(63)
+  const [investment, setInvestment] = useState(10000)
+  const [useClusters, setUseClusters] = useState(false)
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({
+      tickers,
+      lookback_days: lookback,
+      total_investment: investment,
+      use_clusters: useClusters,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            INVERSIÓN TOTAL <span className={styles.bounds}>(reparte entre clusters)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            step="any"
+            value={investment}
+            onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.switchField}`}>
+          <label className={styles.lbl}>
+            USE CLUSTERS <span className={styles.bounds}>(por sector)</span>
+          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={useClusters}
+            className={`${styles.switch} ${useClusters ? styles.switchOn : ''}`}
+            onClick={() => setUseClusters((v) => !v)}
+          >
+            <span className={styles.switchKnob} />
+          </button>
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'CALCULAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <MeanReversionTable data={data} />}
+    </>
+  )
+}
+
+function MeanReversionTable({ data }) {
+  // Agrupar por cluster
+  const byCluster = data.positions.reduce((acc, p) => {
+    const key = p.cluster ?? 'TODOS'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(p)
+    return acc
+  }, {})
+  const clusterOrder = Object.keys(byCluster).sort()
+
+  return (
+    <div className={styles.result}>
+      <div className={styles.resultMeta}>
+        <span>{data.n_clusters} cluster(s) usables</span>
+        <span className={styles.muted}> · {data.n_tickers} tickers con posición</span>
+        {data.n_skipped > 0 && (
+          <span className={styles.muted}> · {data.n_skipped} sin data</span>
+        )}
+        <span className={styles.muted}> · total {fmt.price(data.total_investment)}</span>
+        <span className={styles.muted}> · ts {fmt.ts(data.timestamp)}</span>
+      </div>
+
+      {clusterOrder.map((cluster) => (
+        <div key={cluster} className={styles.mrCluster}>
+          <div className={styles.mrClusterHead}>
+            {data.use_clusters ? `CLUSTER · ${cluster}` : 'TODOS LOS TICKERS'}
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th className={styles.numCol}>RETURN</th>
+                  <th className={styles.numCol}>DEMEANED</th>
+                  <th className={styles.numCol}>POSITION</th>
+                  <th>SIGNAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byCluster[cluster].map((p) => (
+                  <tr
+                    key={p.ticker}
+                    style={{ '--row-color': signalColor(p.signal) }}
+                  >
+                    <td className={styles.tickerCell}>{p.ticker}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.pct(p.log_return)}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.pct(p.demeaned_return)}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.price(p.dollar_position)}</td>
+                    <td className={styles.signalCell}>
+                      <span style={{ color: signalColor(p.signal) }}>
+                        {signalGlyph(p.signal)} {p.signal}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+
+// ============================================
+// Tabla de resultados — reusable para todas las cross strategies
+// ============================================
+function RankingTable({ data }) {
+  return (
+    <div className={styles.result}>
+      <div className={styles.resultMeta}>
+        <span>{data.n_tickers} tickers rankeados</span>
+        {data.n_skipped > 0 && (
+          <span className={styles.muted}> · {data.n_skipped} sin data suficiente</span>
+        )}
+        <span className={styles.muted}> · ts {fmt.ts(data.timestamp)}</span>
+      </div>
+
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>RANK</th>
+              <th>TICKER</th>
+              <th className={styles.numCol}>FACTOR</th>
+              <th>DECILE</th>
+              <th>SIGNAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((it) => (
+              <tr
+                key={it.ticker}
+                style={{ '--row-color': signalColor(it.signal) }}
+                className={it.factor_value == null ? styles.rowSkipped : ''}
+              >
+                <td className="tabular">{it.rank ?? '—'}</td>
+                <td className={styles.tickerCell}>{it.ticker}</td>
+                <td className={`${styles.numCol} tabular`}>
+                  {it.factor_value == null ? '—' : fmt.pct(it.factor_value)}
+                </td>
+                <td className="tabular">{it.decile ?? '—'}</td>
+                <td className={styles.signalCell}>
+                  <span style={{ color: signalColor(it.signal) }}>
+                    {signalGlyph(it.signal)} {it.signal}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

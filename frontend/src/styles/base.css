@@ -1,6 +1,6 @@
 /*
- * Base styles — reset mínimo + body.
- * Mono everywhere. Sin animaciones de spring.
+ * Base styles — Apple Aqua 2009 redesign.
+ * Reset + body (light theme, Lucida Grande) + scrollbar.
  */
 @import './tokens.css';
 
@@ -15,22 +15,23 @@ html, body, #root {
 }
 
 html {
-  font-size: 13px;
-  color-scheme: dark;
+  font-size: 14px;
+  color-scheme: light;
 }
 
 body {
-  font-family: var(--font-mono);
+  font-family: var(--font-system);
   font-size: var(--fs-body);
   line-height: 1.45;
   color: var(--fg-primary);
   background: var(--bg-canvas);
-  font-feature-settings: 'tnum' 1, 'cv02' 1, 'ss01' 1;
+  /* Pinstripe muy sutil sobre el canvas aluminum para el look iTunes */
+  background-image: var(--grad-pinstripe);
+  font-feature-settings: 'tnum' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Números tabulares por default — alineación por punto decimal */
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -46,36 +47,92 @@ button {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 1px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: var(--shadow-input-focus);
 }
 
 input, select {
   font: inherit;
+  font-size: var(--fs-sm);
   color: var(--fg-primary);
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-sm);
-  transition: border-color var(--t-fast) var(--ease);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-input);
+  transition: box-shadow var(--t-fast) var(--ease);
 }
 
 input:hover, select:hover {
-  border-color: var(--border-emph);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.10),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.20);
 }
 
-/* Scrollbar minimal */
+/* ===== Animaciones reusables ===== */
+:root {
+  --anim-overlay: 220ms;
+  --anim-modal:   320ms;
+  --anim-drawer:  500ms;          /* slow enough para que se aprecie el slide */
+  /* Easing con un toque de overshoot para que se sienta "físico" */
+  --ease-out-back: cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-pop-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes drawer-slide-right {
+  from { transform: translateX(105%); }
+  to   { transform: translateX(0); }
+}
+@keyframes drawer-slide-left {
+  from { transform: translateX(-105%); }
+  to   { transform: translateX(0); }
+}
+@keyframes drawer-slide-down {
+  from { transform: translateY(-105%); }
+  to   { transform: translateY(0); }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar amistosa estilo OS X */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-canvas);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-elev-3);
-  border-radius: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-amber-dim);
+  background: rgba(0, 0, 0, 0.4);
+  background-clip: padding-box;
+  border: 3px solid transparent;
 }

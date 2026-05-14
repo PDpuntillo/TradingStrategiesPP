@@ -1,26 +1,36 @@
+/*
+ * Header — OS X-style window toolbar, STICKY al top.
+ * Layout: [brand] [actions] [ticker scroll] [right meta]
+ */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
-  gap: var(--s-5);
+  gap: var(--s-4);
   padding: var(--s-2) var(--s-4);
-  height: 36px;
-  background: var(--bg-elev-1);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  height: 56px;
+  background: var(--grad-toolbar);
+  box-shadow: var(--shadow-toolbar);
+  font-size: var(--fs-sm);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  padding-right: var(--s-3);
+  border-right: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
 }
 
 .brandName {
-  color: var(--accent-amber);
-  font-weight: 700;
+  color: var(--fg-primary);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
 }
 
 .brandSlash {
@@ -28,109 +38,182 @@
 }
 
 .brandSub {
-  color: var(--fg-tertiary);
+  color: var(--fg-secondary);
+  font-size: var(--fs-xs);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ===== Actions (+ ADD / cog) === */
+.actions {
+  display: flex;
+  gap: var(--s-2);
+  padding-right: var(--s-3);
+  border-right: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+
+.addBtn,
+.cogBtn {
+  padding: var(--s-1) var(--s-3);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-aqua-btn);
+  text-transform: uppercase;
+  transition: filter var(--t-fast) var(--ease);
+}
+
+.addBtn:hover,
+.cogBtn:hover {
+  filter: brightness(1.04);
+}
+
+.addBtn:active,
+.cogBtn:active {
+  box-shadow: var(--shadow-aqua-btn-active);
+  filter: brightness(0.95);
+}
+
+/* ===== Ticker shortcuts (scrolleables) ===== */
+.tickerNav {
+  flex: 1;
+  min-width: 0;          /* importante para que overflow-x funcione en grid/flex */
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Scrollbar muy sutil */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  /* Fade hint a los costados para que se vea que hay más */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+.tickerNav::-webkit-scrollbar {
+  height: 4px;
+}
+.tickerNav::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--r-pill);
+}
+.tickerNav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .tickers {
-  display: flex;
-  gap: var(--s-1);
+  display: inline-flex;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 1px;
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .tickerBtn {
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-secondary);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-primary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
-  font-weight: 500;
-  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: filter var(--t-fast) var(--ease);
+}
+
+.tickerBtn:first-child {
+  border-top-left-radius: calc(var(--r-md) - 1px);
+  border-bottom-left-radius: calc(var(--r-md) - 1px);
+}
+.tickerBtn:last-of-type {
+  border-top-right-radius: calc(var(--r-md) - 1px);
+  border-bottom-right-radius: calc(var(--r-md) - 1px);
 }
 
 .tickerBtn:hover {
-  color: var(--fg-primary);
-  background: var(--bg-elev-2);
+  filter: brightness(0.96);
 }
 
 .tickerBtnActive {
-  color: var(--accent-amber);
-  background: var(--bg-elev-2);
+  background: var(--grad-aqua-blue);
+  color: white;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
-.addBtn {
-  margin-left: var(--s-2);
-  padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px dashed var(--border-emph);
-  border-radius: var(--r-sm);
-  letter-spacing: var(--tracking-wide);
-  font-weight: 600;
-  font-size: var(--fs-micro);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+.tickerBtnActive:hover {
+  filter: none;
 }
 
-.addBtn:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
-  border-style: solid;
-}
-
-.cogBtn {
-  margin-left: var(--s-1);
-  padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  letter-spacing: var(--tracking-wide);
-  font-weight: 600;
-  font-size: var(--fs-micro);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.cogBtn:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
-}
-
+/* ===== Right meta (clock + CLEAR CACHE) ===== */
 .right {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  padding-left: var(--s-3);
+  border-left: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
 }
 
 .label {
   color: var(--fg-tertiary);
   font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .value {
   color: var(--fg-secondary);
   font-size: var(--fs-xs);
-}
-
-.divider {
-  width: 1px;
-  height: 12px;
-  background: var(--border);
-  margin: 0 var(--s-2);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .clearBtn {
-  margin-left: var(--s-3);
+  margin-left: var(--s-2);
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-aqua-btn);
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  transition: filter var(--t-fast) var(--ease);
 }
 
 .clearBtn:hover:not(:disabled) {
-  color: var(--accent-amber);
-  border-color: var(--border-emph);
+  filter: brightness(1.04);
+}
+
+.clearBtn:active:not(:disabled) {
+  box-shadow: var(--shadow-aqua-btn-active);
 }
 
 .clearBtn:disabled {
   color: var(--fg-muted);
   cursor: not-allowed;
+  opacity: 0.5;
 }

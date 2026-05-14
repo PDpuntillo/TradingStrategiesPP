@@ -16,11 +16,17 @@ from app.models.strategy import (
     Strategy14Input, Strategy14Output,
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
+    PriceMomentumInput, LowVolatilityInput, ValueInput, MultifactorInput,
+    PairsInput, PairsOutput,
+    MeanReversionInput, MeanReversionOutput,
+    CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
 from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
+    price_momentum, low_volatility, value_strategy, multifactor,
+    pairs_trading, mean_reversion,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -28,6 +34,7 @@ from app.services.tickers_service import (
     list_all_tickers_meta,
     is_ticker_available,
     add_local_ticker,
+    get_sector,
 )
 from pydantic import BaseModel
 
@@ -244,6 +251,183 @@ def run_strategy_18(
         bars_by_ticker[ticker] = data.bars
 
     return strategy_18(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #1: PRICE MOMENTUM
+# ============================================
+@router.post("/cross/momentum", response_model=CrossRankingOutput)
+def run_price_momentum(
+    params: PriceMomentumInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by cumulative return (paper #1)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional momentum requiere al menos 2 tickers",
+        )
+
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    bars_by_ticker = {}
+    needed = params.formation_days + params.skip_days + 1
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+
+    return price_momentum(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #4: LOW VOLATILITY ANOMALY
+# ============================================
+@router.post("/cross/low_volatility", response_model=CrossRankingOutput)
+def run_low_volatility(
+    params: LowVolatilityInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by realized volatility (paper #4)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional low-vol requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    bars_by_ticker = {}
+    needed = params.lookback_days + 1
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+
+    return low_volatility(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #3: VALUE (B/P)
+# ============================================
+@router.post("/cross/value", response_model=CrossRankingOutput)
+def run_value(
+    params: ValueInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by B/P ratio (paper #3)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional value requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    prices_by_ticker = {}
+    fundamentals_by_ticker = {}
+    for ticker in normalized:
+        # Sólo necesitamos el último close para el ratio
+        data = sheets.get_raw_data(ticker, limit=5)
+        prices_by_ticker[ticker] = data.bars[-1].close if data.bars else None
+        # Y la sheet FUNDAMENTALS (silenciosa si no existe)
+        fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
+
+    return value_strategy(fundamentals_by_ticker, prices_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #6: MULTIFACTOR
+# ============================================
+@router.post("/cross/multifactor", response_model=CrossRankingOutput)
+def run_multifactor(
+    params: MultifactorInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Combina momentum + low_vol + value en un score promedio (paper #6)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Multifactor requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    # Una sola fetch de bars + fundamentals + prices para los 3 sub-strategies.
+    # max(lookback) = momentum_formation + momentum_skip + buffer
+    needed = max(
+        params.momentum_formation_days + params.momentum_skip_days,
+        params.lowvol_lookback_days,
+    ) + 50
+
+    bars_by_ticker = {}
+    fundamentals_by_ticker = {}
+    prices_by_ticker = {}
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed)
+        bars_by_ticker[ticker] = data.bars
+        prices_by_ticker[ticker] = data.bars[-1].close if data.bars else None
+        fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
+
+    return multifactor(bars_by_ticker, fundamentals_by_ticker, prices_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #8: PAIRS TRADING
+# ============================================
+@router.post("/cross/pairs", response_model=PairsOutput)
+def run_pairs(
+    params: PairsInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Pairs trading: short el "rich" + long el "cheap" del par (paper #8)."""
+    t_a = _validate_ticker(params.ticker_a)
+    t_b = _validate_ticker(params.ticker_b)
+    if t_a == t_b:
+        raise HTTPException(
+            status_code=400,
+            detail="ticker_a y ticker_b deben ser distintos",
+        )
+    params.ticker_a = t_a
+    params.ticker_b = t_b
+
+    needed = params.lookback_days + 1
+    data_a = sheets.get_raw_data(t_a, limit=needed + 50)
+    data_b = sheets.get_raw_data(t_b, limit=needed + 50)
+    if len(data_a.bars) < needed or len(data_b.bars) < needed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Datos insuficientes: necesito {needed} bars de cada ticker",
+        )
+
+    return pairs_trading(data_a.bars, data_b.bars, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #9/#10: MEAN REVERSION
+# ============================================
+@router.post("/cross/mean_reversion", response_model=MeanReversionOutput)
+def run_mean_reversion(
+    params: MeanReversionInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Mean Reversion (paper #9 single cluster, #10 multiple clusters por sector)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Mean reversion requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    needed = params.lookback_days + 1
+    bars_by_ticker = {}
+    sectors_by_ticker = {}
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+        sectors_by_ticker[ticker] = get_sector(ticker)
+
+    return mean_reversion(bars_by_ticker, sectors_by_ticker, params)
 
 
 # ============================================

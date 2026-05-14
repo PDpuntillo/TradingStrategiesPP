@@ -1,47 +1,63 @@
+/*
+ * TickerLane — card "física" levantada del canvas.
+ * White content, multi-layer shadow (highlight inset + drop + border),
+ * rounded large radius. Look de NSPanel.
+ */
 .lane {
-  background: var(--bg-elev-1);
-  border: 1px solid var(--border);
-  margin: var(--s-3) var(--s-4) 0;
+  background: var(--bg-card);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  margin: var(--s-4) var(--s-5) 0;
+  overflow: hidden;     /* clip las esquinas del rail/chart al radius */
+  /* Offset por el sticky header al hacer scrollIntoView */
+  scroll-margin-top: 72px;
 }
 
 .head {
   display: flex;
   align-items: baseline;
   gap: var(--s-4);
-  padding: var(--s-2) var(--s-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev-2);
+  padding: var(--s-3) var(--s-4);
+  background: var(--grad-card);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .ticker {
-  font-size: var(--fs-md);
-  color: var(--accent-amber);
-  font-weight: 700;
-  letter-spacing: var(--tracking-wide);
+  font-size: var(--fs-lg);
+  color: var(--accent-blue);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .price {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-xl);
   color: var(--fg-primary);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
 }
 
 .delta {
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .bars {
   font-size: var(--fs-micro);
   color: var(--fg-tertiary);
   letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
   margin-left: auto;
 }
 
 .headConsensus {
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
+  padding: 2px var(--s-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-card-soft);
+  box-shadow: var(--shadow-card);
 }
 
 .err {
@@ -52,7 +68,9 @@
 
 .body {
   display: flex;
-  min-height: 320px;
-  /* +50px sobre el original 320 para acomodar el Brush (28px) + period bar */
-  height: 370px;
+  min-height: 360px;
+  height: 410px;
+  background: var(--bg-card);
+  position: relative;  /* container para los drawers contextuales */
+  overflow: hidden;
 }

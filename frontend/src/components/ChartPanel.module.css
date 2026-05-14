@@ -1,57 +1,102 @@
 .chart {
   flex: 1;
   min-width: 0;
-  background: var(--bg-elev-1);
+  background: var(--bg-card);
   padding: var(--s-2);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-}
-
-.periodBar {
-  display: flex;
-  gap: var(--s-1);
-  padding: 0 var(--s-2) var(--s-2);
-  flex-shrink: 0;
-  align-items: center;
-}
-
-.scaleGroup {
-  display: flex;
-  gap: var(--s-1);
-  margin-left: var(--s-3);
-  padding-left: var(--s-3);
-  border-left: 1px solid var(--border);
-}
-
-.periodBtn {
-  padding: 2px var(--s-2);
-  font-size: var(--fs-micro);
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--r-sm);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.periodBtn:hover {
-  color: var(--fg-primary);
-  border-color: var(--border);
-}
-
-.periodBtnActive {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
 }
 
 .empty {
   flex: 1;
   display: grid;
   place-items: center;
-  background: var(--bg-elev-1);
+  background: var(--bg-card);
   color: var(--fg-tertiary);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
   letter-spacing: var(--tracking-wide);
-  border-right: 1px solid var(--border);
+}
+
+.periodBar {
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--s-2) var(--s-2);
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.periodBtn {
+  padding: 3px var(--s-3);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-secondary);
+  background: var(--grad-toolbar-active);
+  border-radius: var(--r-md);
+  font-weight: var(--weight-semibold);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-aqua-btn);
+  transition: filter var(--t-fast) var(--ease);
+}
+
+.periodBtn:hover {
+  filter: brightness(1.04);
+}
+
+.periodBtnActive {
+  background: var(--grad-aqua-blue);
+  color: white;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.periodBtnActive:hover {
+  filter: brightness(1.06);
+}
+
+.scaleGroup {
+  display: flex;
+  gap: 2px;
+  margin-left: var(--s-3);
+  padding-left: var(--s-3);
+  border-left: 1px solid var(--border-soft);
+}
+
+/* ===== Recharts overrides (targeting SVG internals) ===== */
+/* Brush traveller handles — más visibles + estilo aqua */
+:global(.recharts-brush-traveller) > rect:first-child {
+  fill: var(--bg-card);
+  stroke: var(--accent-blue);
+  stroke-width: 1.5;
+  rx: 2;
+}
+:global(.recharts-brush-traveller) > line {
+  stroke: var(--accent-blue);
+  stroke-width: 1.25;
+}
+:global(.recharts-brush-traveller):hover > rect:first-child {
+  fill: var(--accent-blue);
+}
+:global(.recharts-brush-traveller):hover > line {
+  stroke: white;
+}
+
+/* Brush slide (la ventana seleccionada) — tint azul sutil */
+:global(.recharts-brush-slide) {
+  fill: var(--brush-selected-fill);
+  fill-opacity: 1;
+  stroke: none;
+}
+
+/* Brush texts (las fechas en los handles) */
+:global(.recharts-brush-texts text) {
+  fill: var(--fg-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Legend items — más espacio y mejor weight */
+:global(.recharts-legend-item) {
+  margin-right: 12px !important;
+}
+:global(.recharts-legend-item-text) {
+  font-weight: 600 !important;
 }

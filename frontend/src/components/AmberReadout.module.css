@@ -1,33 +1,76 @@
+/* Tooltip del chart — light glass popover */
 .readout {
-  background: var(--bg-canvas);
-  border: 1px solid var(--accent-amber-dim);
-  border-radius: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: var(--r-md);
   padding: var(--s-2) var(--s-3);
   font-size: var(--fs-xs);
   line-height: 1.4;
   pointer-events: none;
+  min-width: 180px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
 .head {
-  color: var(--accent-amber);
-  font-weight: 600;
+  color: var(--accent-blue);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   margin-bottom: var(--s-2);
   padding-bottom: var(--s-1);
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-micro);
+}
+
+/* OHLC block — 2x2 grid */
+.ohlc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--s-2);
+}
+
+.ohlcRow {
+  display: grid;
+  grid-template-columns: 14px 1fr 14px 1fr;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.change {
+  text-align: right;
+  font-size: var(--fs-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  padding-top: 2px;
+}
+
+/* MA rows */
+.mas {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--border-soft);
 }
 
 .row {
   display: grid;
-  grid-template-columns: 8px auto 1fr;
+  grid-template-columns: 10px auto 1fr;
   gap: var(--s-2);
   align-items: center;
 }
 
 .swatch {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .key {
@@ -35,9 +78,12 @@
   text-transform: uppercase;
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
+  font-weight: var(--weight-bold);
 }
 
 .val {
   color: var(--fg-primary);
   text-align: right;
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
 }
