@@ -24,3 +24,23 @@
   border-top: 1px solid var(--border-soft);
   margin-top: var(--s-4);
 }
+
+.message,
+.error {
+  text-align: center;
+  padding: var(--s-6) var(--s-4);
+  font-size: var(--fs-xs);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.message code {
+  color: var(--accent-amber);
+  font-family: var(--font-mono);
+  text-transform: none;
+}
+
+.error {
+  color: var(--sig-short);
+}

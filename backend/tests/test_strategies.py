@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from app.models.strategy import (
-    Ticker, PriceBar, SignalType,
+    PriceBar, SignalType,
     Strategy11Input, Strategy12Input, Strategy13Input,
     Strategy14Input, Strategy15Input, Strategy18Input,
 )
@@ -86,7 +86,7 @@ def test_ema_basic():
 # ============================================
 def test_strategy_11_uptrend(uptrend_bars):
     """En uptrend, precio actual > MA → LONG."""
-    params = Strategy11Input(ticker=Ticker.GGAL, ma_period=20)
+    params = Strategy11Input(ticker="GGAL", ma_period=20)
     out = strategy_11(uptrend_bars, params)
     assert out.signal == SignalType.LONG
     assert out.current_price > out.ma_value
@@ -94,7 +94,7 @@ def test_strategy_11_uptrend(uptrend_bars):
 
 def test_strategy_11_downtrend(downtrend_bars):
     """En downtrend, precio actual < MA → SHORT."""
-    params = Strategy11Input(ticker=Ticker.GGAL, ma_period=20)
+    params = Strategy11Input(ticker="GGAL", ma_period=20)
     out = strategy_11(downtrend_bars, params)
     assert out.signal == SignalType.SHORT
     assert out.current_price < out.ma_value
@@ -106,7 +106,7 @@ def test_strategy_11_downtrend(downtrend_bars):
 def test_strategy_12_uptrend(uptrend_bars):
     """Uptrend: MA short > MA long → LONG."""
     params = Strategy12Input(
-        ticker=Ticker.GGAL,
+        ticker="GGAL",
         ma_short_period=10,
         ma_long_period=30,
     )
@@ -117,7 +117,7 @@ def test_strategy_12_uptrend(uptrend_bars):
 
 def test_strategy_12_downtrend(downtrend_bars):
     params = Strategy12Input(
-        ticker=Ticker.GGAL,
+        ticker="GGAL",
         ma_short_period=10,
         ma_long_period=30,
     )
@@ -131,7 +131,7 @@ def test_strategy_12_downtrend(downtrend_bars):
 def test_strategy_13_uptrend(uptrend_bars):
     """Uptrend: MA1 > MA2 > MA3 → LONG."""
     params = Strategy13Input(
-        ticker=Ticker.GGAL,
+        ticker="GGAL",
         ma1_period=3,
         ma2_period=10,
         ma3_period=21,
@@ -144,7 +144,7 @@ def test_strategy_13_uptrend(uptrend_bars):
 
 def test_strategy_13_downtrend(downtrend_bars):
     params = Strategy13Input(
-        ticker=Ticker.GGAL,
+        ticker="GGAL",
         ma1_period=3,
         ma2_period=10,
         ma3_period=21,
@@ -160,7 +160,7 @@ def test_strategy_13_downtrend(downtrend_bars):
 def test_strategy_14_pivot_relationship():
     """Pivot debe estar entre support y resistance."""
     bars = make_bars([100, 102])  # high=103.02, low=99.96, close=102
-    params = Strategy14Input(ticker=Ticker.GGAL)
+    params = Strategy14Input(ticker="GGAL")
     out = strategy_14(bars, params)
     assert out.support < out.pivot < out.resistance
 
@@ -172,7 +172,7 @@ def test_strategy_15_at_lower_band():
     """Si precio = band_lower → LONG."""
     prices = [100.0] * 19 + [90.0] + [89.5]  # último precio en piso
     bars = make_bars(prices)
-    params = Strategy15Input(ticker=Ticker.GGAL, channel_period=20)
+    params = Strategy15Input(ticker="GGAL", channel_period=20)
     out = strategy_15(bars, params)
     assert out.signal == SignalType.LONG
 
@@ -182,7 +182,7 @@ def test_strategy_15_at_upper_band():
     # 20 históricos en 100, uno en 110 (será el upper), precio actual también en 110
     prices = [100.0] * 19 + [110.0] + [110.0]
     bars = make_bars(prices)
-    params = Strategy15Input(ticker=Ticker.GGAL, channel_period=20)
+    params = Strategy15Input(ticker="GGAL", channel_period=20)
     out = strategy_15(bars, params)
     assert out.signal == SignalType.SHORT
 
@@ -193,12 +193,12 @@ def test_strategy_15_at_upper_band():
 def test_strategy_18_weights_normalized(uptrend_bars, downtrend_bars, sideways_bars):
     """Σ |w_i| = 1."""
     bars_by_ticker = {
-        Ticker.GGAL: uptrend_bars,
-        Ticker.YPF: downtrend_bars,
-        Ticker.PAMP: sideways_bars,
+        "GGAL": uptrend_bars,
+        "YPF": downtrend_bars,
+        "PAMP": sideways_bars,
     }
     params = Strategy18Input(
-        tickers=[Ticker.GGAL, Ticker.YPF, Ticker.PAMP],
+        tickers=["GGAL", "YPF", "PAMP"],
         lookback_days=60,
         total_investment=10000.0,
     )
@@ -210,12 +210,12 @@ def test_strategy_18_weights_normalized(uptrend_bars, downtrend_bars, sideways_b
 def test_strategy_18_dollar_neutral(uptrend_bars, downtrend_bars, sideways_bars):
     """Si dollar_neutral=True, Σ w_i = 0."""
     bars_by_ticker = {
-        Ticker.GGAL: uptrend_bars,
-        Ticker.YPF: downtrend_bars,
-        Ticker.PAMP: sideways_bars,
+        "GGAL": uptrend_bars,
+        "YPF": downtrend_bars,
+        "PAMP": sideways_bars,
     }
     params = Strategy18Input(
-        tickers=[Ticker.GGAL, Ticker.YPF, Ticker.PAMP],
+        tickers=["GGAL", "YPF", "PAMP"],
         lookback_days=60,
         dollar_neutral=True,
     )

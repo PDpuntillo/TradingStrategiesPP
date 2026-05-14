@@ -3,13 +3,17 @@ import { fmt } from '../lib/format'
 import { api } from '../lib/api'
 import styles from './Header.module.css'
 
-const TICKERS = ['GGAL', 'YPF', 'PAMP']
-
 /*
  * Header — cinta superior tipo ticker tape.
  * Brand · tickers · timestamp · clear cache.
+ *
+ * Props:
+ *   tickers: TickerInfo[] — la lista viene del Dashboard (useTickers hook)
+ *   selectedTicker: string | null
+ *   onSelectTicker: (ticker) => void
+ *   lastUpdated: ISO string
  */
-export default function Header({ selectedTicker, onSelectTicker, lastUpdated }) {
+export default function Header({ tickers = [], selectedTicker, onSelectTicker, lastUpdated }) {
   const [clearing, setClearing] = useState(false)
 
   // Tick cada 30s para refrescar el "ahora" del clock derecho
@@ -47,15 +51,16 @@ export default function Header({ selectedTicker, onSelectTicker, lastUpdated }) 
       </div>
 
       <nav className={styles.tickers} aria-label="Tickers">
-        {TICKERS.map((t) => (
+        {tickers.map((t) => (
           <button
-            key={t}
+            key={t.ticker}
             className={`${styles.tickerBtn} ${
-              t === selectedTicker ? styles.tickerBtnActive : ''
+              t.ticker === selectedTicker ? styles.tickerBtnActive : ''
             }`}
-            onClick={() => onSelectTicker?.(t)}
+            onClick={() => onSelectTicker?.(t.ticker)}
+            title={t.name}
           >
-            {t}.BA
+            {t.ticker}.BA
           </button>
         ))}
       </nav>

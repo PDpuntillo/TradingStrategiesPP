@@ -26,6 +26,7 @@ async function request(path, options = {}) {
 export const api = {
   // ===== Tickers =====
   listTickers: () => request('/tickers'),
+  listAllTickers: () => request('/tickers/all'),
   getTicker: (ticker, limit = 500) => request(`/ticker/${ticker}?limit=${limit}`),
 
   // ===== Strategies (POST) =====

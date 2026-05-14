@@ -11,7 +11,7 @@ import styles from './TickerLane.module.css'
  * Layout: [consensus rail] · [chart] · [signals strip]
  * Header pequeño arriba con price + delta.
  */
-export default function TickerLane({ ticker, onOpenStrategy }) {
+export default function TickerLane({ ticker, tickerName, onOpenStrategy }) {
   const { data: bars, loading: barsLoading, error: barsError } = useTickerData(ticker)
   const { data: signals, loading: sigLoading, error: sigError } = useSignals(ticker)
 
@@ -24,7 +24,7 @@ export default function TickerLane({ ticker, onOpenStrategy }) {
   return (
     <article className={styles.lane}>
       <header className={styles.head}>
-        <span className={styles.ticker}>{ticker}.BA</span>
+        <span className={styles.ticker} title={tickerName}>{ticker}.BA</span>
         <span className={`${styles.price} tabular`}>{fmt.price(last)}</span>
         <span
           className={`${styles.delta} tabular`}
