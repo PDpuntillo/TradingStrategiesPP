@@ -41,8 +41,13 @@ const STRATS = [
     description: 'Combina momentum + low-vol + value en un score promedio de ranks. Top decile (menor score) = LONG.',
     paperRef: 'paper #6',
   },
+  {
+    id: 'pairs',
+    label: 'PAIRS',
+    description: 'Dos tickers correlacionados: cuando uno overperforma vs el promedio del par, está "rich" → SHORT, el otro "cheap" → LONG. Dollar-neutral.',
+    paperRef: 'paper #8',
+  },
   // Próximas en commits siguientes:
-  // { id: 'pairs', ... },
   // { id: 'mr_single', ... },
   // { id: 'mr_multiple', ... },
 ]
@@ -121,6 +126,9 @@ export default function CrossSectionalPanel({ availableTickers = [] }) {
             tickers={selectedTickers}
             availableTickers={availableTickers}
           />
+        )}
+        {activeId === 'pairs' && (
+          <PairsRunner availableTickers={availableTickers} />
         )}
       </div>
 
@@ -431,6 +439,167 @@ function FactorCheck({ label, on, onToggle }) {
     >
       {on ? '■' : '□'} {label}
     </button>
+  )
+}
+
+
+// ============================================
+// Sub-component: Pairs Trading runner
+// ============================================
+function PairsRunner({ availableTickers }) {
+  const { data, loading, error, run } = useCrossStrategy('pairs')
+  const [tickerA, setTickerA] = useState('')
+  const [tickerB, setTickerB] = useState('')
+  const [lookback, setLookback] = useState(63)
+  const [investment, setInvestment] = useState(10000)
+
+  // Auto-seleccionar los primeros 2 cuando llega availableTickers
+  useEffect(() => {
+    if (!tickerA && availableTickers.length >= 1) setTickerA(availableTickers[0].ticker)
+    if (!tickerB && availableTickers.length >= 2) setTickerB(availableTickers[1].ticker)
+  }, [availableTickers]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sameTicker = tickerA && tickerB && tickerA === tickerB
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (!tickerA || !tickerB || sameTicker) return
+    run({
+      ticker_a: tickerA,
+      ticker_b: tickerB,
+      lookback_days: lookback,
+      total_investment: investment,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>TICKER A</label>
+          <select value={tickerA} onChange={(e) => setTickerA(e.target.value)}>
+            {availableTickers.map((t) => (
+              <option key={t.ticker} value={t.ticker}>{t.ticker} · {t.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>TICKER B</label>
+          <select value={tickerB} onChange={(e) => setTickerB(e.target.value)}>
+            {availableTickers.map((t) => (
+              <option key={t.ticker} value={t.ticker}>{t.ticker} · {t.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || !tickerA || !tickerB || sameTicker}
+        >
+          {loading ? 'CALCULANDO…' : 'CALCULAR'}
+        </button>
+      </form>
+
+      <div className={styles.subForm}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            INVERSIÓN TOTAL <span className={styles.bounds}>(se divide 50/50)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            step="any"
+            value={investment}
+            onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
+          />
+        </div>
+      </div>
+
+      {sameTicker && (
+        <div className={styles.warning}>Ticker A y B deben ser distintos.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <PairsCard data={data} />}
+    </>
+  )
+}
+
+function PairsCard({ data }) {
+  const { ticker_a, ticker_b, correlation, lookback_days, mean_return, positions, total_investment, timestamp } = data
+
+  const corrColor =
+    Math.abs(correlation) >= 0.7 ? 'var(--sig-long)' :
+    Math.abs(correlation) >= 0.4 ? 'var(--accent-amber)' :
+    'var(--sig-short)'
+
+  return (
+    <div className={styles.pairsResult}>
+      <div className={styles.pairsHeader}>
+        <div className={styles.pairsTitle}>
+          {ticker_a}.BA <span className={styles.pairsVs}>×</span> {ticker_b}.BA
+        </div>
+        <div className={styles.pairsMeta}>
+          <span>lookback {lookback_days}d</span>
+          <span>·</span>
+          <span>corr</span>
+          <span className="tabular" style={{ color: corrColor }}>
+            {fmt.ratio(correlation)}
+          </span>
+          <span>·</span>
+          <span>mean return</span>
+          <span className="tabular">{fmt.pct(mean_return)}</span>
+        </div>
+      </div>
+
+      <div className={styles.pairsPositions}>
+        {positions.map((p) => (
+          <div
+            key={p.ticker}
+            className={styles.pairsRow}
+            style={{ '--row-color': signalColor(p.signal) }}
+          >
+            <div className={styles.pairsTicker}>{p.ticker}.BA</div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>RETURN</div>
+              <div className={`${styles.pairsVal} tabular`}>{fmt.pct(p.log_return)}</div>
+            </div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>DEMEANED</div>
+              <div className={`${styles.pairsVal} tabular`}>{fmt.pct(p.demeaned_return)}</div>
+            </div>
+            <div className={styles.pairsCol}>
+              <div className={styles.pairsLbl}>POSITION</div>
+              <div className={`${styles.pairsVal} tabular`}>
+                {fmt.price(p.dollar_position)}
+              </div>
+            </div>
+            <div
+              className={styles.pairsSignal}
+              style={{ color: signalColor(p.signal) }}
+            >
+              {signalGlyph(p.signal)} {p.signal}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.resultMeta}>
+        total {fmt.price(total_investment)} · ts {fmt.ts(timestamp)}
+      </div>
+    </div>
   )
 }
 

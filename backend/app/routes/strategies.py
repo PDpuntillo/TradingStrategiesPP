@@ -17,6 +17,7 @@ from app.models.strategy import (
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
     PriceMomentumInput, LowVolatilityInput, ValueInput, MultifactorInput,
+    PairsInput, PairsOutput,
     CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
@@ -24,6 +25,7 @@ from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
     price_momentum, low_volatility, value_strategy, multifactor,
+    pairs_trading,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -365,6 +367,37 @@ def run_multifactor(
         fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
 
     return multifactor(bars_by_ticker, fundamentals_by_ticker, prices_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #8: PAIRS TRADING
+# ============================================
+@router.post("/cross/pairs", response_model=PairsOutput)
+def run_pairs(
+    params: PairsInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Pairs trading: short el "rich" + long el "cheap" del par (paper #8)."""
+    t_a = _validate_ticker(params.ticker_a)
+    t_b = _validate_ticker(params.ticker_b)
+    if t_a == t_b:
+        raise HTTPException(
+            status_code=400,
+            detail="ticker_a y ticker_b deben ser distintos",
+        )
+    params.ticker_a = t_a
+    params.ticker_b = t_b
+
+    needed = params.lookback_days + 1
+    data_a = sheets.get_raw_data(t_a, limit=needed + 50)
+    data_b = sheets.get_raw_data(t_b, limit=needed + 50)
+    if len(data_a.bars) < needed or len(data_b.bars) < needed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Datos insuficientes: necesito {needed} bars de cada ticker",
+        )
+
+    return pairs_trading(data_a.bars, data_b.bars, params)
 
 
 # ============================================

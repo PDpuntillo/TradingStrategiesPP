@@ -34,6 +34,8 @@ from app.models.strategy import (
     LowVolatilityInput,
     ValueInput,
     MultifactorInput,
+    PairsInput,
+    PairsPosition, PairsOutput,
 )
 
 
@@ -759,6 +761,97 @@ def multifactor(
         items=with_data + without_data,
         n_tickers=len(with_data),
         n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #8: PAIRS TRADING
+# ============================================
+def pairs_trading(
+    bars_a: List[PriceBar],
+    bars_b: List[PriceBar],
+    params: PairsInput,
+) -> PairsOutput:
+    """
+    Paper #8 — Pairs Trading.
+
+    Idea: dos tickers históricamente correlacionados deberían moverse
+    juntos. Cuando uno overperforma vs el promedio del par, está "rich"
+    y se shortea; el otro está "cheap" y se compra. Dollar-neutral.
+
+    Formulas:
+        R_A = ln(P_A_t2 / P_A_t1)        log return de A sobre la ventana
+        R_B = ln(P_B_t2 / P_B_t1)        log return de B
+        R_mean = (R_A + R_B) / 2         media del par
+        R_tilde_A = R_A - R_mean         demeaned return de A
+        R_tilde_B = R_B - R_mean = -R_tilde_A
+
+    Signal: R_tilde > 0 → ticker está "rich" → SHORT
+            R_tilde < 0 → ticker está "cheap" → LONG
+
+    La correlación (Pearson) del par sobre la ventana se devuelve como
+    contexto — pares con correlation > 0.7 son los típicamente usables.
+    """
+    needed = params.lookback_days + 1
+    if len(bars_a) < needed or len(bars_b) < needed:
+        raise ValueError(
+            f"Necesito al menos {needed} bars de ambos tickers"
+        )
+
+    closes_a = np.array([b.close for b in bars_a[-needed:]], dtype=float)
+    closes_b = np.array([b.close for b in bars_b[-needed:]], dtype=float)
+
+    # Log returns sobre la ventana completa: end / start
+    R_A = float(np.log(closes_a[-1] / closes_a[0]))
+    R_B = float(np.log(closes_b[-1] / closes_b[0]))
+    R_mean = (R_A + R_B) / 2
+    R_tilde_A = R_A - R_mean
+    R_tilde_B = R_B - R_mean
+
+    # Correlación de los daily returns (contexto, no la usamos para la signal)
+    daily_a = np.diff(closes_a) / closes_a[:-1]
+    daily_b = np.diff(closes_b) / closes_b[:-1]
+    correlation = float(np.corrcoef(daily_a, daily_b)[0, 1]) if len(daily_a) > 1 else 0.0
+
+    # Dollar positions: half del investment por lado, signo según demeaned
+    half = params.total_investment / 2
+    pos_a = -half if R_tilde_A > 0 else (half if R_tilde_A < 0 else 0.0)
+    pos_b = -half if R_tilde_B > 0 else (half if R_tilde_B < 0 else 0.0)
+
+    def _signal(rt: float) -> SignalType:
+        if rt > 0.001:
+            return SignalType.SHORT
+        if rt < -0.001:
+            return SignalType.LONG
+        return SignalType.HOLD
+
+    positions = [
+        PairsPosition(
+            ticker=params.ticker_a,
+            log_return=R_A,
+            demeaned_return=R_tilde_A,
+            dollar_position=pos_a,
+            signal=_signal(R_tilde_A),
+        ),
+        PairsPosition(
+            ticker=params.ticker_b,
+            log_return=R_B,
+            demeaned_return=R_tilde_B,
+            dollar_position=pos_b,
+            signal=_signal(R_tilde_B),
+        ),
+    ]
+
+    return PairsOutput(
+        strategy_name="pairs_trading",
+        ticker_a=params.ticker_a,
+        ticker_b=params.ticker_b,
+        correlation=correlation,
+        lookback_days=params.lookback_days,
+        mean_return=R_mean,
+        positions=positions,
+        total_investment=params.total_investment,
         timestamp=datetime.now(),
     )
 

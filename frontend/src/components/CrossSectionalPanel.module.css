@@ -223,6 +223,103 @@
   border-color: var(--accent-amber-dim);
 }
 
+/* ===== Pairs card ===== */
+.subForm {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto;
+  gap: var(--s-4);
+  align-items: end;
+  margin-top: -1px;
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: var(--s-4);
+}
+
+.pairsResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.pairsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-3);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-elev-2);
+}
+
+.pairsTitle {
+  font-size: var(--fs-md);
+  color: var(--fg-primary);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+}
+
+.pairsVs {
+  color: var(--fg-muted);
+  margin: 0 var(--s-2);
+}
+
+.pairsMeta {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.pairsPositions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.pairsRow {
+  display: grid;
+  grid-template-columns: 100px repeat(3, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--row-color, transparent);
+  background: var(--bg-elev-1);
+}
+
+.pairsTicker {
+  font-size: var(--fs-md);
+  color: var(--accent-amber);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+}
+
+.pairsCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.pairsLbl {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+}
+
+.pairsVal {
+  font-size: var(--fs-sm);
+  color: var(--fg-primary);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.pairsSignal {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+}
+
 .error {
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--sig-short);

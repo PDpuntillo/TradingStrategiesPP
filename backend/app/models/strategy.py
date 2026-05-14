@@ -271,3 +271,34 @@ class MultifactorInput(BaseModel):
     momentum_formation_days: int = Field(default=126, ge=21, le=504)
     momentum_skip_days: int = Field(default=21, ge=0, le=63)
     lowvol_lookback_days: int = Field(default=126, ge=21, le=504)
+
+
+class PairsInput(BaseModel):
+    """Input para Pairs Trading (paper #8)."""
+    ticker_a: Ticker
+    ticker_b: Ticker
+    # Ventana para computar el demeaned return (3 meses default)
+    lookback_days: int = Field(default=63, ge=21, le=504)
+    total_investment: float = Field(default=10000.0, gt=0)
+
+
+class PairsPosition(BaseModel):
+    """Posición de un ticker dentro del par."""
+    ticker: Ticker
+    log_return: float
+    demeaned_return: float
+    dollar_position: float        # signed: positive=long, negative=short
+    signal: SignalType
+
+
+class PairsOutput(BaseModel):
+    """Output de Pairs Trading."""
+    strategy_name: str = "pairs_trading"
+    ticker_a: Ticker
+    ticker_b: Ticker
+    correlation: float            # para contexto: qué tan correlacionado es el par
+    lookback_days: int
+    mean_return: float
+    positions: List[PairsPosition]   # exactamente 2 items
+    total_investment: float
+    timestamp: datetime
