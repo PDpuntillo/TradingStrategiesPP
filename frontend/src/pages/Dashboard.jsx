@@ -8,7 +8,7 @@ import styles from './Dashboard.module.css'
 
 export default function Dashboard() {
   // Tickers disponibles (cargados del backend, dinámicos)
-  const { data: tickers, loading: tickersLoading, error: tickersError } = useTickers()
+  const { data: tickers, loading: tickersLoading, error: tickersError, refetch: refetchTickers } = useTickers()
 
   // Ticker seleccionado en header (visual, no filtra lanes)
   const [selectedTicker, setSelectedTicker] = useState(null)
@@ -33,6 +33,7 @@ export default function Dashboard() {
         selectedTicker={selectedTicker}
         onSelectTicker={setSelectedTicker}
         lastUpdated={new Date().toISOString()}
+        onTickerAdded={refetchTickers}
       />
 
       <main className={styles.main}>

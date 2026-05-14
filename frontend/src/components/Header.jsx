@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fmt } from '../lib/format'
 import { api } from '../lib/api'
+import AddTickerModal from './AddTickerModal'
 import styles from './Header.module.css'
 
 /*
@@ -13,8 +14,9 @@ import styles from './Header.module.css'
  *   onSelectTicker: (ticker) => void
  *   lastUpdated: ISO string
  */
-export default function Header({ tickers = [], selectedTicker, onSelectTicker, lastUpdated }) {
+export default function Header({ tickers = [], selectedTicker, onSelectTicker, lastUpdated, onTickerAdded }) {
   const [clearing, setClearing] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   // Tick cada 30s para refrescar el "ahora" del clock derecho
   const [now, setNow] = useState(() => new Date())
@@ -63,7 +65,21 @@ export default function Header({ tickers = [], selectedTicker, onSelectTicker, l
             {t.ticker}.BA
           </button>
         ))}
+        <button
+          type="button"
+          className={styles.addBtn}
+          onClick={() => setAddOpen(true)}
+          title="Agregar ticker"
+        >
+          + ADD
+        </button>
       </nav>
+
+      <AddTickerModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSuccess={() => onTickerAdded?.()}
+      />
 
       <div className={styles.right}>
         <span className={styles.label}>last fetch</span>

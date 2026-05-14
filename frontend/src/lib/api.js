@@ -27,6 +27,11 @@ export const api = {
   // ===== Tickers =====
   listTickers: () => request('/tickers'),
   listAllTickers: () => request('/tickers/all'),
+  addTicker: (ticker, sheetIdOrUrl) =>
+    request('/tickers/add', {
+      method: 'POST',
+      body: JSON.stringify({ ticker, sheet_id_or_url: sheetIdOrUrl }),
+    }),
   getTicker: (ticker, limit = 500) => request(`/ticker/${ticker}?limit=${limit}`),
 
   // ===== Strategies (POST) =====

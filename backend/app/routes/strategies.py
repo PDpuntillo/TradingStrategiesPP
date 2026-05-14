@@ -27,7 +27,9 @@ from app.services.tickers_service import (
     list_available_tickers,
     list_all_tickers_meta,
     is_ticker_available,
+    add_local_ticker,
 )
+from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/api", tags=["strategies"])
@@ -60,6 +62,36 @@ def list_all_tickers():
     Útil para que el frontend muestre un selector con la lista completa Merval.
     """
     return list_all_tickers_meta()
+
+
+class AddTickerInput(BaseModel):
+    ticker: str
+    sheet_id_or_url: str
+
+
+class AddTickerOutput(BaseModel):
+    ticker: str
+    sheet_id: str
+    persisted_locally: bool
+    snippet_for_prod: str
+
+
+@router.post("/tickers/add", response_model=AddTickerOutput)
+def add_ticker(payload: AddTickerInput):
+    """
+    Agrega un ticker al registry.
+
+    En dev (DEBUG=True): persiste a sheet_ids_local.json y queda
+    inmediatamente disponible en el listing.
+
+    En prod (DEBUG=False): NO persiste (filesystem efímero), pero
+    devuelve el snippet que el usuario tiene que copiar al env var
+    SHEET_IDS_JSON en el dashboard de Render.
+    """
+    try:
+        return AddTickerOutput(**add_local_ticker(payload.ticker, payload.sheet_id_or_url))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================

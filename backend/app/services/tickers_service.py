@@ -11,9 +11,10 @@ aparecen como "no configurados" en logs pero no se exponen al frontend.
 """
 import json
 import logging
+import re
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from app.config import get_settings
 from app.models.strategy import TickerInfo
@@ -21,7 +22,53 @@ from app.models.strategy import TickerInfo
 
 logger = logging.getLogger(__name__)
 
-_META_PATH = Path(__file__).parent.parent / "data" / "tickers_meta.json"
+_DATA_DIR = Path(__file__).parent.parent / "data"
+_META_PATH = _DATA_DIR / "tickers_meta.json"
+# Solo se usa en local. En prod (filesystem ephemeral) este archivo no
+# persiste entre restarts del dyno, así que escrituras no tienen sentido.
+_LOCAL_SHEET_IDS_PATH = _DATA_DIR / "sheet_ids_local.json"
+
+
+def _extract_sheet_id(input_str: str) -> str:
+    """Acepta sheet_id puro o URL completa de Google Sheets."""
+    s = input_str.strip()
+    # URL: https://docs.google.com/spreadsheets/d/<ID>/edit?...
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", s)
+    if m:
+        return m.group(1)
+    return s
+
+
+def _load_local_sheet_ids() -> dict[str, str]:
+    """Lee sheet_ids_local.json (dev-only persistence)."""
+    if not _LOCAL_SHEET_IDS_PATH.exists():
+        return {}
+    try:
+        with _LOCAL_SHEET_IDS_PATH.open(encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return {k.upper(): v for k, v in data.items() if v}
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"sheet_ids_local.json invalido: {e}")
+    return {}
+
+
+def _save_local_sheet_ids(ids: dict[str, str]) -> None:
+    """Persiste sheet_ids_local.json. NO usar en prod."""
+    _DATA_DIR.mkdir(exist_ok=True)
+    with _LOCAL_SHEET_IDS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(ids, f, indent=2, ensure_ascii=False)
+
+
+def merged_sheet_ids() -> dict[str, str]:
+    """
+    Mapa final ticker → sheet_id, mergeando:
+    1. Settings (env vars: legacy SPREADSHEET_ID_* y SHEET_IDS_JSON)
+    2. sheet_ids_local.json (dev only — overrides env)
+    """
+    result = dict(get_settings().spreadsheet_ids_map)
+    result.update(_load_local_sheet_ids())
+    return result
 
 
 @lru_cache()
@@ -44,13 +91,12 @@ def list_available_tickers() -> List[TickerInfo]:
     """
     Devuelve la lista de tickers disponibles para el frontend.
 
-    Un ticker está "disponible" cuando tiene tanto:
-    - Una entry en tickers_meta.json (para mostrar nombre/sector)
-    - Un sheet_id en settings (sino el backend no puede leer sus datos)
+    Un ticker está "disponible" cuando tiene un sheet_id configurado
+    (env var o local JSON). La metadata es opcional — si no está en
+    tickers_meta.json el name cae al símbolo.
     """
-    settings = get_settings()
     meta = _load_meta()
-    sheet_ids = settings.spreadsheet_ids_map
+    sheet_ids = merged_sheet_ids()
 
     available: List[TickerInfo] = []
     for ticker, sid in sheet_ids.items():
@@ -83,9 +129,7 @@ def list_all_tickers_meta() -> List[TickerInfo]:
     sheet_id configurado). El frontend la puede usar para mostrar un
     selector de "agregar nuevos tickers" / search.
     """
-    settings = get_settings()
     meta = _load_meta()
-    configured = set(settings.spreadsheet_ids_map.keys())
 
     all_tickers: List[TickerInfo] = []
     for ticker, m in meta.items():
@@ -103,4 +147,53 @@ def list_all_tickers_meta() -> List[TickerInfo]:
 
 def is_ticker_available(ticker: str) -> bool:
     """True si el ticker tiene sheet_id configurado y es leíble."""
-    return ticker.upper() in get_settings().spreadsheet_ids_map
+    return ticker.upper() in merged_sheet_ids()
+
+
+def add_local_ticker(ticker: str, sheet_id_or_url: str) -> dict:
+    """
+    Agrega un ticker al sheet_ids_local.json (dev-only).
+
+    Returns un dict con info para que el frontend pueda mostrar:
+    - el snippet listo para copiar al SHEET_IDS_JSON env var de prod
+    - el estado (writable / readonly) según si estamos en dev
+
+    Raises ValueError si el input es invalido.
+    """
+    t = ticker.strip().upper()
+    if not t or not t.isalnum():
+        raise ValueError(
+            f"Ticker '{ticker}' inválido — usá solo letras/números"
+        )
+
+    sid = _extract_sheet_id(sheet_id_or_url)
+    if not sid or len(sid) < 20:
+        raise ValueError(
+            f"Sheet ID '{sid}' parece inválido — debería ser un string alfanumérico de ~44 chars"
+        )
+
+    settings = get_settings()
+    writable = settings.debug
+
+    if writable:
+        current = _load_local_sheet_ids()
+        current[t] = sid
+        _save_local_sheet_ids(current)
+        logger.info(f"Ticker {t} agregado a sheet_ids_local.json")
+    else:
+        logger.info(f"Ticker {t} solicitado en prod — no persistido (filesystem ephemeral)")
+
+    # Snippet para copiar a Render dashboard
+    full_map = merged_sheet_ids()
+    if not writable:
+        # En prod, simulamos el merge para mostrarle qué quedaría
+        full_map[t] = sid
+
+    snippet_json = json.dumps(full_map, separators=(",", ":"))
+
+    return {
+        "ticker": t,
+        "sheet_id": sid,
+        "persisted_locally": writable,
+        "snippet_for_prod": snippet_json,
+    }
