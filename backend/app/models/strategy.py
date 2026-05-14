@@ -258,3 +258,16 @@ class ValueInput(BaseModel):
     # Métrica a usar como ratio B/P. Por default lee 'BookValuePerShare'
     # de la sheet FUNDAMENTALS de cada ticker y lo divide por current price.
     book_value_metric: str = "BookValuePerShare"
+
+
+class MultifactorInput(BaseModel):
+    """Input para Multifactor portfolio (paper #6)."""
+    tickers: List[Ticker]
+    # Toggles para incluir/excluir cada factor del combined score
+    include_momentum: bool = True
+    include_low_volatility: bool = True
+    include_value: bool = True
+    # Params de los sub-strategies (defaults razonables)
+    momentum_formation_days: int = Field(default=126, ge=21, le=504)
+    momentum_skip_days: int = Field(default=21, ge=0, le=63)
+    lowvol_lookback_days: int = Field(default=126, ge=21, le=504)

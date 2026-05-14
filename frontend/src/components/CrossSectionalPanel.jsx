@@ -35,8 +35,13 @@ const STRATS = [
     description: 'Rankea por B/P = BookValuePerShare / current_price. Top decile = LONG (más "cheap"). Requiere que cada ticker tenga la sheet FUNDAMENTALS con BookValuePerShare cargada a mano (ver docs).',
     paperRef: 'paper #3',
   },
+  {
+    id: 'multifactor',
+    label: 'MULTIFACTOR',
+    description: 'Combina momentum + low-vol + value en un score promedio de ranks. Top decile (menor score) = LONG.',
+    paperRef: 'paper #6',
+  },
   // Próximas en commits siguientes:
-  // { id: 'multifactor', ... },
   // { id: 'pairs', ... },
   // { id: 'mr_single', ... },
   // { id: 'mr_multiple', ... },
@@ -107,6 +112,12 @@ export default function CrossSectionalPanel({ availableTickers = [] }) {
         )}
         {activeId === 'value' && (
           <ValueRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'multifactor' && (
+          <MultifactorRunner
             tickers={selectedTickers}
             availableTickers={availableTickers}
           />
@@ -318,6 +329,108 @@ function ValueRunner({ tickers }) {
       {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
       {data && <RankingTable data={data} />}
     </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Multifactor runner
+// ============================================
+function MultifactorRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('multifactor')
+  const [includeMomentum, setIncludeMomentum] = useState(true)
+  const [includeLowVol, setIncludeLowVol] = useState(true)
+  const [includeValue, setIncludeValue] = useState(true)
+  const [momentumFormation, setMomentumFormation] = useState(126)
+  const [lowvolLookback, setLowvolLookback] = useState(126)
+
+  const enabledCount = [includeMomentum, includeLowVol, includeValue].filter(Boolean).length
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2 || enabledCount === 0) return
+    run({
+      tickers,
+      include_momentum: includeMomentum,
+      include_low_volatility: includeLowVol,
+      include_value: includeValue,
+      momentum_formation_days: momentumFormation,
+      momentum_skip_days: 21,
+      lowvol_lookback_days: lowvolLookback,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>FACTORES ACTIVOS <span className={styles.bounds}>{enabledCount}/3</span></label>
+          <div className={styles.factorChecks}>
+            <FactorCheck label="Momentum" on={includeMomentum} onToggle={() => setIncludeMomentum((v) => !v)} />
+            <FactorCheck label="Low Vol" on={includeLowVol} onToggle={() => setIncludeLowVol((v) => !v)} />
+            <FactorCheck label="Value" on={includeValue} onToggle={() => setIncludeValue((v) => !v)} />
+          </div>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            MOMENTUM FORMATION <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={momentumFormation}
+            onChange={(e) => setMomentumFormation(parseInt(e.target.value, 10))}
+            disabled={!includeMomentum}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOW-VOL LOOKBACK <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lowvolLookback}
+            onChange={(e) => setLowvolLookback(parseInt(e.target.value, 10))}
+            disabled={!includeLowVol}
+          />
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2 || enabledCount === 0}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {enabledCount === 0 && (
+        <div className={styles.warning}>Habilitá al menos 1 factor.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+function FactorCheck({ label, on, onToggle }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      className={`${styles.factorCheck} ${on ? styles.factorOn : ''}`}
+      onClick={onToggle}
+    >
+      {on ? '■' : '□'} {label}
+    </button>
   )
 }
 

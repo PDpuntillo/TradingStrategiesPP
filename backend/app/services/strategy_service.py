@@ -33,6 +33,7 @@ from app.models.strategy import (
     PriceMomentumInput,
     LowVolatilityInput,
     ValueInput,
+    MultifactorInput,
 )
 
 
@@ -647,6 +648,115 @@ def value_strategy(
         strategy_name="value",
         description=f"B/P ratio = {params.book_value_metric} / current_price — top decile = LONG (más value)",
         items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #6: MULTIFACTOR
+# ============================================
+def multifactor(
+    bars_by_ticker: dict,
+    fundamentals_by_ticker: dict,
+    prices_by_ticker: dict,
+    params: MultifactorInput,
+) -> CrossRankingOutput:
+    """
+    Paper #6 — Multifactor portfolio.
+
+    Combina los rankings de momentum, low-vol y value en un score promedio:
+      s_Ai = rank(f_Ai) / N           (rank normalizado a [0,1], 0=mejor)
+      s_i  = (1/F) * sum_A(s_Ai)      (promedio cross-factor)
+
+    Rankea ASC por s_i (menor score = mejor combined rank = top decile = LONG).
+
+    Sub-strategies enabled/disabled vía params.include_*.
+    """
+    tickers = list(bars_by_ticker.keys())
+    sub_outputs: dict = {}
+
+    if params.include_momentum:
+        sub_outputs["momentum"] = price_momentum(
+            bars_by_ticker,
+            PriceMomentumInput(
+                tickers=tickers,
+                formation_days=params.momentum_formation_days,
+                skip_days=params.momentum_skip_days,
+            ),
+        )
+    if params.include_low_volatility:
+        sub_outputs["low_volatility"] = low_volatility(
+            bars_by_ticker,
+            LowVolatilityInput(
+                tickers=tickers,
+                lookback_days=params.lowvol_lookback_days,
+            ),
+        )
+    if params.include_value:
+        sub_outputs["value"] = value_strategy(
+            fundamentals_by_ticker,
+            prices_by_ticker,
+            ValueInput(tickers=tickers),
+        )
+
+    if not sub_outputs:
+        # Edge case: el user deshabilitó todos
+        return CrossRankingOutput(
+            strategy_name="multifactor",
+            description="No factors enabled",
+            items=[CrossRankingItem(
+                ticker=t, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ) for t in tickers],
+            n_tickers=0,
+            n_skipped=len(tickers),
+            timestamp=datetime.now(),
+        )
+
+    # Combinar: para cada ticker, promedio de ranks normalizados a [0,1]
+    # (0 = top, 1 = bottom).
+    combined: dict = {}
+    for ticker in tickers:
+        normalized_ranks = []
+        for sub_name, sub_out in sub_outputs.items():
+            sub_item = next(
+                (x for x in sub_out.items if x.ticker == ticker), None
+            )
+            if sub_item is None or sub_item.rank is None:
+                continue
+            n = sub_out.n_tickers
+            if n <= 1:
+                normalized_ranks.append(0.0)
+            else:
+                normalized_ranks.append((sub_item.rank - 1) / (n - 1))
+        # Necesitamos al menos 1 sub-strategy con dato para incluir este ticker
+        if normalized_ranks:
+            combined[ticker] = sum(normalized_ranks) / len(normalized_ranks)
+
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+    for ticker in tickers:
+        score = combined.get(ticker)
+        if score is None:
+            n_skipped += 1
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=score,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value)  # asc — menor score = mejor
+    _assign_deciles_and_signals(with_data)
+
+    enabled = ", ".join(sub_outputs.keys())
+    return CrossRankingOutput(
+        strategy_name="multifactor",
+        description=f"Combined rank score across {len(sub_outputs)} factors: {enabled}",
+        items=with_data + without_data,
         n_tickers=len(with_data),
         n_skipped=n_skipped,
         timestamp=datetime.now(),

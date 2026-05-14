@@ -198,6 +198,31 @@
   padding: var(--s-2) 0;
 }
 
+.factorChecks {
+  display: flex;
+  gap: var(--s-2);
+}
+
+.factorCheck {
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-weight: 600;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.factorCheck:hover {
+  color: var(--fg-primary);
+}
+
+.factorOn {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber-dim);
+}
+
 .error {
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--sig-short);

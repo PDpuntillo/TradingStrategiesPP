@@ -16,14 +16,14 @@ from app.models.strategy import (
     Strategy14Input, Strategy14Output,
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
-    PriceMomentumInput, LowVolatilityInput, ValueInput,
+    PriceMomentumInput, LowVolatilityInput, ValueInput, MultifactorInput,
     CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
 from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
-    price_momentum, low_volatility, value_strategy,
+    price_momentum, low_volatility, value_strategy, multifactor,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -329,6 +329,42 @@ def run_value(
         fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
 
     return value_strategy(fundamentals_by_ticker, prices_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #6: MULTIFACTOR
+# ============================================
+@router.post("/cross/multifactor", response_model=CrossRankingOutput)
+def run_multifactor(
+    params: MultifactorInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Combina momentum + low_vol + value en un score promedio (paper #6)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Multifactor requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    # Una sola fetch de bars + fundamentals + prices para los 3 sub-strategies.
+    # max(lookback) = momentum_formation + momentum_skip + buffer
+    needed = max(
+        params.momentum_formation_days + params.momentum_skip_days,
+        params.lowvol_lookback_days,
+    ) + 50
+
+    bars_by_ticker = {}
+    fundamentals_by_ticker = {}
+    prices_by_ticker = {}
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed)
+        bars_by_ticker[ticker] = data.bars
+        prices_by_ticker[ticker] = data.bars[-1].close if data.bars else None
+        fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
+
+    return multifactor(bars_by_ticker, fundamentals_by_ticker, prices_by_ticker, params)
 
 
 # ============================================
