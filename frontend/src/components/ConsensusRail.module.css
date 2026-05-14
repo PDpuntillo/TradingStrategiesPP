@@ -1,11 +1,14 @@
-/* Signature unificado: rail ancho con info de cada estrategia + consensus footer */
+/*
+ * ConsensusRail — sidebar OS X style con header gradient
+ * y rows con left-stripe colored por signal.
+ */
 .rail {
   display: flex;
   flex-direction: column;
-  width: 320px;
-  min-width: 320px;
-  background: var(--bg-elev-1);
-  border-right: 1px solid var(--border);
+  width: 340px;
+  min-width: 340px;
+  background: var(--bg-card-soft);
+  border-right: 1px solid var(--border-soft);
 }
 
 .head {
@@ -13,30 +16,39 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--s-2) var(--s-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev-2);
+  background: var(--grad-toolbar);
+  border-bottom: 1px solid var(--border-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .headLabel {
-  font-size: var(--fs-micro);
-  color: var(--accent-amber);
+  font-size: var(--fs-xs);
+  color: var(--fg-secondary);
   letter-spacing: var(--tracking-wide);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .cog {
+  padding: 2px var(--s-2);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  border-radius: var(--r-md);
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  padding: 2px var(--s-2);
-  border-radius: var(--r-sm);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  font-weight: var(--weight-semibold);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-aqua-btn);
+  transition: filter var(--t-fast) var(--ease);
 }
 
 .cog:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
+  filter: brightness(1.04);
+}
+
+.cog:active {
+  box-shadow: var(--shadow-aqua-btn-active);
 }
 
 .rows {
@@ -44,6 +56,7 @@
   flex-direction: column;
   flex: 1;
   overflow-y: auto;
+  background: var(--bg-card);
 }
 
 .empty {
@@ -52,27 +65,26 @@
   color: var(--fg-tertiary);
   text-align: center;
   letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 28px 32px 12px 56px 1fr auto;
+  grid-template-columns: 32px 36px 16px 64px 1fr auto;
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-2) var(--s-3);
+  padding: var(--s-3);
   text-align: left;
   border-bottom: 1px solid var(--border-soft);
-  border-left: 3px solid var(--seg-color, var(--bg-elev-3));
+  border-left: 4px solid var(--seg-color, transparent);
   transition: background var(--t-fast) var(--ease);
 }
 
 .row:hover:not(:disabled) {
-  background: var(--bg-elev-2);
+  background: rgba(59, 125, 216, 0.06);    /* azul hint */
 }
 
 .row:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -80,24 +92,27 @@
   color: var(--fg-tertiary);
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
+  font-weight: var(--weight-semibold);
 }
 
 .rowName {
   font-size: var(--fs-xs);
-  color: var(--fg-secondary);
+  color: var(--fg-primary);
   letter-spacing: var(--tracking-wide);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
+/* Glyph como LED pequeño */
 .rowGlyph {
   font-size: var(--fs-md);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-align: center;
+  text-shadow: 0 0 6px var(--seg-color);
 }
 
 .rowSig {
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
 }
 
@@ -108,35 +123,43 @@
 }
 
 .metaLbl {
-  font-size: 9px;
+  font-size: var(--fs-micro);
   color: var(--fg-muted);
   letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .metaVal {
   font-size: var(--fs-xs);
   color: var(--fg-secondary);
+  font-weight: var(--weight-medium);
 }
 
+/* Footer del consensus — más prominente, gradient + signal color */
 .consensus {
   display: flex;
   flex-direction: column;
   padding: var(--s-3);
-  border-top: 1px solid var(--border);
-  border-left: 3px solid var(--seg-color);
-  background: var(--bg-elev-2);
+  background: var(--grad-toolbar-active);
+  border-top: 1px solid var(--border-soft);
+  border-left: 4px solid var(--seg-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .consensusLabel {
   font-size: var(--fs-micro);
   color: var(--fg-tertiary);
   letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .consensusValue {
   font-size: var(--fs-md);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--seg-color);
   letter-spacing: var(--tracking-wide);
-  margin-top: var(--s-1);
+  margin-top: 2px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }

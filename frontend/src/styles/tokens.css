@@ -134,15 +134,15 @@
   --font-mono: "Lucida Grande", "Helvetica Neue", "Helvetica", sans-serif;  /* legacy alias */
   --font-data: "Lucida Grande", "Helvetica Neue", "Helvetica", sans-serif;
 
-  --fs-micro: 10px;
-  --fs-xs:    11px;
-  --fs-sm:    12px;
-  --fs-body:  13px;
-  --fs-md:    14px;
-  --fs-lg:    16px;
-  --fs-xl:    20px;
-  --fs-data:  28px;          /* hero números, à la Apple Stocks app */
-  --fs-mega:  40px;
+  --fs-micro: 11px;
+  --fs-xs:    12px;
+  --fs-sm:    13px;
+  --fs-body:  14px;
+  --fs-md:    16px;
+  --fs-lg:    18px;
+  --fs-xl:    22px;
+  --fs-data:  32px;          /* hero números, à la Apple Stocks app */
+  --fs-mega:  44px;
 
   --weight-regular: 400;
   --weight-medium: 500;

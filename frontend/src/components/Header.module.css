@@ -1,26 +1,33 @@
+/*
+ * Header — OS X-style window toolbar.
+ * Brushed aluminum gradient, white inset highlight at top, dark
+ * hairline at bottom. Ticker pills become rounded segmented tabs.
+ */
 .header {
   display: flex;
   align-items: center;
-  gap: var(--s-5);
+  gap: var(--s-4);
   padding: var(--s-2) var(--s-4);
-  height: 36px;
-  background: var(--bg-elev-1);
-  border-bottom: 1px solid var(--border);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  height: 52px;
+  background: var(--grad-toolbar);
+  box-shadow: var(--shadow-toolbar);
+  font-size: var(--fs-sm);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  padding-right: var(--s-3);
+  border-right: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .brandName {
-  color: var(--accent-amber);
-  font-weight: 700;
+  color: var(--fg-primary);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wide);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: var(--fs-sm);
 }
 
 .brandSlash {
@@ -28,68 +35,88 @@
 }
 
 .brandSub {
-  color: var(--fg-tertiary);
+  color: var(--fg-secondary);
+  font-size: var(--fs-xs);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
+/* ===== Ticker pills como segmented control ===== */
 .tickers {
   display: flex;
-  gap: var(--s-1);
+  gap: 1px;                                  /* hairline entre pills */
+  background: rgba(0, 0, 0, 0.18);           /* el divider entre pills */
+  padding: 1px;
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .tickerBtn {
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-secondary);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-primary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
-  font-weight: 500;
-  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: filter var(--t-fast) var(--ease);
+}
+
+.tickerBtn:first-child {
+  border-top-left-radius: calc(var(--r-md) - 1px);
+  border-bottom-left-radius: calc(var(--r-md) - 1px);
+}
+.tickerBtn:last-of-type {
+  border-top-right-radius: calc(var(--r-md) - 1px);
+  border-bottom-right-radius: calc(var(--r-md) - 1px);
 }
 
 .tickerBtn:hover {
-  color: var(--fg-primary);
-  background: var(--bg-elev-2);
+  filter: brightness(0.96);
 }
 
 .tickerBtnActive {
-  color: var(--accent-amber);
-  background: var(--bg-elev-2);
+  background: var(--grad-aqua-blue);
+  color: white;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
-.addBtn {
-  margin-left: var(--s-2);
-  padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px dashed var(--border-emph);
-  border-radius: var(--r-sm);
-  letter-spacing: var(--tracking-wide);
-  font-weight: 600;
-  font-size: var(--fs-micro);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+.tickerBtnActive:hover {
+  filter: none;
 }
 
-.addBtn:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
-  border-style: solid;
-}
-
+/* ===== + ADD y ⚙ buttons (capsule-y) ===== */
+.addBtn,
 .cogBtn {
-  margin-left: var(--s-1);
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
-  font-weight: 600;
-  font-size: var(--fs-micro);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-aqua-btn);
+  margin-left: var(--s-2);
+  transition: filter var(--t-fast) var(--ease);
 }
 
+.addBtn:hover,
 .cogBtn:hover {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber-dim);
+  filter: brightness(1.04);
 }
 
+.addBtn:active,
+.cogBtn:active {
+  box-shadow: var(--shadow-aqua-btn-active);
+  filter: brightness(0.95);
+}
+
+/* ===== Right meta ===== */
 .right {
   margin-left: auto;
   display: flex;
@@ -100,37 +127,48 @@
 .label {
   color: var(--fg-tertiary);
   font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .value {
   color: var(--fg-secondary);
   font-size: var(--fs-xs);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .divider {
   width: 1px;
-  height: 12px;
-  background: var(--border);
+  height: 14px;
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.6);
   margin: 0 var(--s-2);
 }
 
 .clearBtn {
   margin-left: var(--s-3);
   padding: var(--s-1) var(--s-3);
-  color: var(--fg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-aqua-btn);
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: filter var(--t-fast) var(--ease);
 }
 
 .clearBtn:hover:not(:disabled) {
-  color: var(--accent-amber);
-  border-color: var(--border-emph);
+  filter: brightness(1.04);
+}
+
+.clearBtn:active:not(:disabled) {
+  box-shadow: var(--shadow-aqua-btn-active);
 }
 
 .clearBtn:disabled {
   color: var(--fg-muted);
   cursor: not-allowed;
+  opacity: 0.5;
 }
