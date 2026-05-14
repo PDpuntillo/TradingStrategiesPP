@@ -103,6 +103,10 @@ input:hover, select:hover {
   from { transform: translateX(-105%); }
   to   { transform: translateX(0); }
 }
+@keyframes drawer-slide-down {
+  from { transform: translateY(-105%); }
+  to   { transform: translateY(0); }
+}
 
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {

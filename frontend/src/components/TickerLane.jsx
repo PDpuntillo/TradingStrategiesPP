@@ -1,21 +1,29 @@
+import { useState } from 'react'
 import { useTickerData } from '../hooks/useTickerData'
 import { useSignals } from '../hooks/useSignals'
 import ConsensusRail from './ConsensusRail'
 import ChartPanel from './ChartPanel'
+import StrategySelector from './StrategySelector'
 import { fmt, signalColor } from '../lib/format'
 import styles from './TickerLane.module.css'
 
 /*
  * TickerLane — la franja horizontal por ticker.
- * Layout: [consensus rail (con todas las strategies)] · [chart]
- * Header pequeño arriba con price + delta.
+ * Layout: [consensus rail] · [chart]
  *
- * El SignalsStrip de la derecha se eliminó en favor del rail unificado:
- * cada row del rail ya muestra signal + valor de referencia + precio.
+ * El drawer del StrategySelector vive DENTRO de la lane (no a nivel
+ * Dashboard) — sale como overlay desde el borde izquierdo de la lane,
+ * con su misma altura y sin oscurecer el resto de la página. Cada
+ * lane abre el suyo independiente.
  */
-export default function TickerLane({ ticker, tickerName, onOpenStrategy }) {
+export default function TickerLane({ ticker, tickerName }) {
   const { data: bars, loading: barsLoading, error: barsError } = useTickerData(ticker)
   const { data: signals, loading: sigLoading, error: sigError } = useSignals(ticker)
+
+  // Drawer state local a la lane
+  const [strategyDrawer, setStrategyDrawer] = useState({ open: false, num: null })
+  const openStrategy = (n) => setStrategyDrawer({ open: true, num: n })
+  const closeStrategy = () => setStrategyDrawer((d) => ({ ...d, open: false }))
 
   const lastBar = bars?.bars?.[bars.bars.length - 1]
   const prevBar = bars?.bars?.[bars.bars.length - 2]
@@ -57,9 +65,17 @@ export default function TickerLane({ ticker, tickerName, onOpenStrategy }) {
           signals={signals}
           consensus={signals?.consensus_signal}
           loading={sigLoading}
-          onSegmentClick={(n) => onOpenStrategy?.(ticker, n)}
+          onSegmentClick={openStrategy}
         />
         <ChartPanel data={bars} signals={signals} loading={barsLoading} />
+
+        {/* Drawer contextual a la lane — overlay absoluto, sin backdrop */}
+        <StrategySelector
+          open={strategyDrawer.open}
+          ticker={ticker}
+          strategyNum={strategyDrawer.num}
+          onClose={closeStrategy}
+        />
       </div>
     </article>
   )

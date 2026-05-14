@@ -3,7 +3,6 @@ import Header from '../components/Header'
 import TickerLane from '../components/TickerLane'
 import PortfolioOptimizer from '../components/PortfolioOptimizer'
 import CrossSectionalPanel from '../components/CrossSectionalPanel'
-import StrategySelector from '../components/StrategySelector'
 import { useTickers } from '../hooks/useTickers'
 import { useLaneConfig } from '../hooks/useLaneConfig'
 import styles from './Dashboard.module.css'
@@ -15,21 +14,14 @@ export default function Dashboard() {
   // Visibilidad y orden de las lanes — persistido en localStorage
   const laneConfig = useLaneConfig(tickers ?? [])
 
-  // Ticker seleccionado en header (visual, no filtra lanes)
+  // Ticker seleccionado en header (visual, para el scrollIntoView)
   const [selectedTicker, setSelectedTicker] = useState(null)
 
-  // Drawer del strategy selector
-  const [drawer, setDrawer] = useState({ open: false, ticker: null, strategyNum: null })
-
-  // Sync default selection con el primer ticker disponible
   useEffect(() => {
     if (!selectedTicker && tickers?.length) {
       setSelectedTicker(tickers[0].ticker)
     }
   }, [tickers, selectedTicker])
-
-  const openStrategy = (ticker, n) => setDrawer({ open: true, ticker, strategyNum: n })
-  const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }))
 
   return (
     <div className={styles.shell}>
@@ -55,13 +47,12 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Solo renderear lanes visibles, en el orden custom del usuario */}
+        {/* Cada lane maneja su propio drawer del strategy selector */}
         {laneConfig.visibleOrdered.map((t) => (
           <TickerLane
             key={t.ticker}
             ticker={t.ticker}
             tickerName={t.name}
-            onOpenStrategy={openStrategy}
           />
         ))}
 
@@ -75,13 +66,6 @@ export default function Dashboard() {
           <span>Backend FastAPI · Sheets API Key · Vite + React</span>
         </footer>
       </main>
-
-      <StrategySelector
-        open={drawer.open}
-        ticker={drawer.ticker}
-        strategyNum={drawer.strategyNum}
-        onClose={closeDrawer}
-      />
     </div>
   )
 }

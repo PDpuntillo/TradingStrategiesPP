@@ -59,9 +59,7 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
   if (!open) return null
 
   return (
-    <>
-      <div className={styles.overlay} onClick={onClose} aria-hidden />
-      <aside className={styles.drawer} role="dialog" aria-label={`Strategy ${strategyNum}`}>
+    <aside className={styles.drawer} role="dialog" aria-label={`Strategy ${strategyNum}`}>
         <header className={styles.head}>
           <div>
             <div className={styles.sNum}>STRATEGY {strategyNum}</div>
@@ -149,7 +147,6 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
             <div className={styles.resFoot}>{fmt.ts(data.timestamp)}</div>
           </div>
         )}
-      </aside>
-    </>
+    </aside>
   )
 }

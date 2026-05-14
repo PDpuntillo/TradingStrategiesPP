@@ -71,4 +71,6 @@
   min-height: 360px;
   height: 410px;
   background: var(--bg-card);
+  position: relative;  /* container para los drawers contextuales */
+  overflow: hidden;
 }
