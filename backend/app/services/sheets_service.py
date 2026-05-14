@@ -167,9 +167,16 @@ class SheetsService:
         Columna D: Low
         Columna E: Close
         Columna F: Volume
+
+        Se lee TODO el rango (A2:F sin end row) y luego se slicea las
+        últimas `limit` barras. Antes leíamos A2:F{limit+1} que devolvía
+        las PRIMERAS limit filas — funcionaba por casualidad cuando la
+        sheet tenía ~limit filas, pero al expandir el histórico (ej. 5y)
+        el chart mostraba las barras MÁS VIEJAS en lugar de las recientes.
         """
-        cell_range = f"A2:F{limit + 1}"
-        rows = self.read_range(ticker, "RAW_DATA", cell_range)
+        # Range sin upper bound: la API de Sheets devuelve todas las filas
+        # con datos. Cache key se vuelve estable (no depende del limit).
+        rows = self.read_range(ticker, "RAW_DATA", "A2:F")
 
         bars: List[PriceBar] = []
         for row in rows:
@@ -194,6 +201,11 @@ class SheetsService:
             except (ValueError, IndexError) as e:
                 logger.warning(f"Skip row inválida: {row} - {e}")
                 continue
+
+        # Las barras vienen en orden cronológico ascendente. Tomar las
+        # últimas `limit` para que el frontend siempre vea lo más reciente.
+        if limit and len(bars) > limit:
+            bars = bars[-limit:]
 
         return TickerData(
             ticker=ticker,
