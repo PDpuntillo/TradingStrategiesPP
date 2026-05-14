@@ -250,3 +250,11 @@ class LowVolatilityInput(BaseModel):
     lookback_days: int = Field(default=126, ge=21, le=504)
     # Si True, anualiza la vol (sqrt(252) * daily_std). Solo afecta el display.
     annualized: bool = Field(default=True)
+
+
+class ValueInput(BaseModel):
+    """Input para Value (paper #3)."""
+    tickers: List[Ticker]
+    # Métrica a usar como ratio B/P. Por default lee 'BookValuePerShare'
+    # de la sheet FUNDAMENTALS de cada ticker y lo divide por current price.
+    book_value_metric: str = "BookValuePerShare"

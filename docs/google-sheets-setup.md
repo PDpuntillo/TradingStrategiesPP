@@ -262,6 +262,49 @@ Abrir [http://127.0.0.1:8000/api/ticker/GGAL](http://127.0.0.1:8000/api/ticker/G
 
 ---
 
+## 8.5. (Opcional) Sheet `FUNDAMENTALS` para la estrategia Value
+
+La estrategia cross-sectional **Value (B/P)** necesita el **Book Value per Share** de cada ticker. GOOGLEFINANCE no provee este dato; se ingresa **a mano** (~4 veces al año, cuando salen los balances).
+
+### Cómo configurarlo
+
+1. En cada spreadsheet de ticker (`GGAL.BA`, `YPF.BA`, etc.), agregá una **pestaña nueva** llamada **exactamente** `FUNDAMENTALS`
+2. Layout:
+
+| | A (Metric) | B (Value) | C (As of, opcional) |
+|---|---|---|---|
+| 1 | `Metric` | `Value` | `AsOf` |
+| 2 | `BookValuePerShare` | `39804.28` | `2026-Q1` |
+| 3 | `Shares` | `393310000` | `2026-Q1` |
+| 4 | `MarketCap` | `26200000000` | `2026-Q1` |
+
+- Fila 1 = headers (el backend la skipea)
+- Columna A = nombre del metric, **case-sensitive y sin espacios**
+- Columna B = valor numérico (en ARS — moneda del ticker)
+- Columna C = trimestre/fecha, opcional (no se usa, sólo referencia)
+
+### Métricas soportadas hoy
+
+| Metric | Usada por | Notas |
+|---|---|---|
+| `BookValuePerShare` | Value (B/P) | **Required para Value** |
+| `Shares` | (futuro) | Para weighted strategies — opcional |
+| `MarketCap` | (futuro) | Idem |
+
+### Dónde sacar el Book Value
+
+- [investing.com](https://www.investing.com/) → buscás el ticker → tab "Financial Summary" → "Book Value/Share MRQ"
+- O Yahoo Finance, Stock Analysis, etc.
+- Para Argentina/Merval, valores en ARS
+
+### Cómo el backend lo consume
+
+- Lee `FUNDAMENTALS!A2:C` cuando corrés `/api/cross/value`
+- Cache 5 min (mismo que RAW_DATA)
+- Si un ticker no tiene la sheet o no tiene `BookValuePerShare`, queda como `—` en el ranking (no rompe el resto)
+
+---
+
 ## 9. Checklist de Fase 2
 
 - [ ] API Key creada y restringida a Sheets API

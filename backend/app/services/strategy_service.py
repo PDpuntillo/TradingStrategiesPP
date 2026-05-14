@@ -32,6 +32,7 @@ from app.models.strategy import (
     CrossRankingItem, CrossRankingOutput,
     PriceMomentumInput,
     LowVolatilityInput,
+    ValueInput,
 )
 
 
@@ -589,6 +590,62 @@ def low_volatility(
     return CrossRankingOutput(
         strategy_name="low_volatility",
         description=f"Realized {('annualized ' if params.annualized else '')}volatility last {params.lookback_days}d — anomaly: low-vol stocks outperform",
+        items=final_items,
+        n_tickers=len(with_data),
+        n_skipped=n_skipped,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #3: VALUE (B/P)
+# ============================================
+def value_strategy(
+    fundamentals_by_ticker: dict,
+    prices_by_ticker: dict,
+    params: ValueInput,
+) -> CrossRankingOutput:
+    """
+    Paper #3 — Value.
+
+    Factor: B/P = BookValuePerShare / current_price.
+
+    Rankea descendente (mayor B/P → ticker más "value/cheap" → top decile
+    = LONG, bottom = SHORT). Tickers sin BookValuePerShare en su
+    FUNDAMENTALS sheet aparecen como skipped.
+
+    fundamentals_by_ticker: {ticker: {metric: value}}
+    prices_by_ticker:       {ticker: last_close_float}
+    """
+    items: List[CrossRankingItem] = []
+    n_skipped = 0
+
+    for ticker, price in prices_by_ticker.items():
+        fundamentals = fundamentals_by_ticker.get(ticker, {})
+        book = fundamentals.get(params.book_value_metric)
+        if book is None or price is None or price <= 0:
+            items.append(CrossRankingItem(
+                ticker=ticker, factor_value=None, rank=None,
+                decile=None, signal=SignalType.HOLD,
+            ))
+            n_skipped += 1
+            continue
+        bp_ratio = float(book) / float(price)
+        items.append(CrossRankingItem(
+            ticker=ticker,
+            factor_value=bp_ratio,
+            rank=None, decile=None, signal=SignalType.HOLD,
+        ))
+
+    with_data = [it for it in items if it.factor_value is not None]
+    without_data = [it for it in items if it.factor_value is None]
+    with_data.sort(key=lambda it: it.factor_value, reverse=True)  # desc
+    _assign_deciles_and_signals(with_data)
+    final_items = with_data + without_data
+
+    return CrossRankingOutput(
+        strategy_name="value",
+        description=f"B/P ratio = {params.book_value_metric} / current_price — top decile = LONG (más value)",
         items=final_items,
         n_tickers=len(with_data),
         n_skipped=n_skipped,

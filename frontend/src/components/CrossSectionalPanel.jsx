@@ -29,8 +29,13 @@ const STRATS = [
     description: 'Anomaly: portfolios de baja volatilidad tienden a outperformar en el largo plazo. Rankea ASC por vol realizada — top decile = LONG (baja vol).',
     paperRef: 'paper #4',
   },
+  {
+    id: 'value',
+    label: 'VALUE (B/P)',
+    description: 'Rankea por B/P = BookValuePerShare / current_price. Top decile = LONG (más "cheap"). Requiere que cada ticker tenga la sheet FUNDAMENTALS con BookValuePerShare cargada a mano (ver docs).',
+    paperRef: 'paper #3',
+  },
   // Próximas en commits siguientes:
-  // { id: 'value', ... },
   // { id: 'multifactor', ... },
   // { id: 'pairs', ... },
   // { id: 'mr_single', ... },
@@ -96,6 +101,12 @@ export default function CrossSectionalPanel({ availableTickers = [] }) {
         )}
         {activeId === 'low_volatility' && (
           <LowVolatilityRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
+        )}
+        {activeId === 'value' && (
+          <ValueRunner
             tickers={selectedTickers}
             availableTickers={availableTickers}
           />
@@ -247,6 +258,51 @@ function LowVolatilityRunner({ tickers }) {
           </button>
         </div>
         <div /> {/* spacer en la grid 3 cols */}
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'RANKEAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <RankingTable data={data} />}
+    </>
+  )
+}
+
+
+// ============================================
+// Sub-component: Value runner
+// ============================================
+function ValueRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('value')
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({ tickers })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            FUENTE
+            <span className={styles.bounds}>FUNDAMENTALS!BookValuePerShare</span>
+          </label>
+          <div className={styles.notice}>
+            Cargá Book Value por ticker en la pestaña FUNDAMENTALS
+            (ver docs/google-sheets-setup.md sección "Value strategy").
+          </div>
+        </div>
+        <div /> <div /> {/* spacers para mantener la grid */}
         <button
           type="submit"
           className={styles.submit}

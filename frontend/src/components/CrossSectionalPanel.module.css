@@ -190,6 +190,14 @@
   margin-bottom: var(--s-4);
 }
 
+.notice {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+  line-height: 1.5;
+  padding: var(--s-2) 0;
+}
+
 .error {
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--sig-short);

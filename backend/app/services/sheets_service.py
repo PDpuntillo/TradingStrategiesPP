@@ -219,6 +219,38 @@ class SheetsService:
             last_updated=datetime.now(),
         )
 
+    def get_fundamentals(self, ticker: Ticker) -> dict:
+        """
+        Lee la sheet FUNDAMENTALS del ticker (opcional, mantenida a mano).
+
+        Formato esperado:
+            Row 1: header (Metric, Value, AsOf) — skipeado
+            Row 2+: A=metric_name, B=value (numérico), C=as_of (string, opcional)
+
+        Returns dict {metric_name: float_value}. Si la sheet no existe,
+        devuelve dict vacío en vez de raisear (la estrategia que necesite
+        ese dato skipea el ticker en su ranking).
+        """
+        try:
+            rows = self.read_range(ticker, "FUNDAMENTALS", "A2:C")
+        except Exception as e:
+            logger.debug(f"FUNDAMENTALS no disponible para {ticker}: {e}")
+            return {}
+
+        result: dict = {}
+        for row in rows:
+            if len(row) < 2:
+                continue
+            metric = row[0].strip() if isinstance(row[0], str) else str(row[0]).strip()
+            if not metric:
+                continue
+            try:
+                result[metric] = float(row[1])
+            except (ValueError, TypeError):
+                logger.warning(f"FUNDAMENTALS {ticker}: valor no numérico para '{metric}': {row[1]}")
+                continue
+        return result
+
     def get_strategy_sheet(
         self,
         ticker: Ticker,

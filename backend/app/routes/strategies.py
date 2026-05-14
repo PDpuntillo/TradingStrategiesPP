@@ -16,14 +16,14 @@ from app.models.strategy import (
     Strategy14Input, Strategy14Output,
     Strategy15Input, Strategy15Output,
     Strategy18Input, Strategy18Output,
-    PriceMomentumInput, LowVolatilityInput,
+    PriceMomentumInput, LowVolatilityInput, ValueInput,
     CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
 from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
-    price_momentum, low_volatility,
+    price_momentum, low_volatility, value_strategy,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -300,6 +300,35 @@ def run_low_volatility(
         bars_by_ticker[ticker] = data.bars
 
     return low_volatility(bars_by_ticker, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #3: VALUE (B/P)
+# ============================================
+@router.post("/cross/value", response_model=CrossRankingOutput)
+def run_value(
+    params: ValueInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Cross-sectional ranking by B/P ratio (paper #3)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Cross-sectional value requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    prices_by_ticker = {}
+    fundamentals_by_ticker = {}
+    for ticker in normalized:
+        # Sólo necesitamos el último close para el ratio
+        data = sheets.get_raw_data(ticker, limit=5)
+        prices_by_ticker[ticker] = data.bars[-1].close if data.bars else None
+        # Y la sheet FUNDAMENTALS (silenciosa si no existe)
+        fundamentals_by_ticker[ticker] = sheets.get_fundamentals(ticker)
+
+    return value_strategy(fundamentals_by_ticker, prices_by_ticker, params)
 
 
 # ============================================
