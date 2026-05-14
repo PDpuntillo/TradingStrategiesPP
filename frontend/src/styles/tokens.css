@@ -62,11 +62,22 @@
   --sig-neutral: #8A8A8E;
   --grad-neutral: linear-gradient(180deg, #C0C0C5 0%, #9090954 50%, #707075 100%);
 
-  /* ===== Chart overlays (legibles sobre light theme) ===== */
-  --overlay-cyan:   #2D9CB4;
-  --overlay-blue:   #3678D8;
-  --overlay-violet: #7A52C8;
-  --overlay-grid:   rgba(0, 0, 0, 0.06);
+  /* ===== Chart series colors (legibles sobre light theme + distinguibles entre sí) ===== */
+  /* MAs: tres colores bien separados en el wheel (verde / naranja / violeta).
+     Evitamos azul para que no compita con el accent y con la Donchian band. */
+  --overlay-cyan:   #1F8F4F;   /* MA10 — verde oscuro */
+  --overlay-blue:   #D77900;   /* MA20 — naranja saturado */
+  --overlay-violet: #7A3FB8;   /* MA50 — violeta intenso */
+  /* Donchian bands — azul saturado para contraste con las MAs */
+  --overlay-donchian: #2459B5;
+  /* Pivot/Support/Resistance — gris medio dashed (neutro, no compite con MAs) */
+  --overlay-pivot:  #707075;
+  /* Grid casi invisible — sólo para orientación */
+  --overlay-grid:   rgba(0, 0, 0, 0.07);
+  /* Brush handle / outline */
+  --brush-stroke:   #3B7DD8;   /* Apple Blue */
+  --brush-fill:     #F7F7F9;
+  --brush-selected-fill: rgba(59, 125, 216, 0.10);
 
   /* ===== Spacing — más aireado que terminal ===== */
   --s-0: 0;

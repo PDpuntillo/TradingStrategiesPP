@@ -173,29 +173,32 @@ export default function ChartPanel({ data, signals, loading }) {
             allowDataOverflow
             width={64}
           />
-          <Tooltip content={<AmberReadout />} cursor={{ stroke: 'var(--accent-amber)', strokeOpacity: 0.4 }} />
+          <Tooltip
+            content={<AmberReadout />}
+            cursor={{ stroke: 'var(--accent-blue)', strokeOpacity: 0.5, strokeWidth: 1 }}
+          />
 
           {/* Pivot / S / R como líneas horizontales (Strategy 14) */}
           {pivot && (
             <>
-              <ReferenceLine y={pivot.resistance} stroke="var(--sig-short)" strokeDasharray="2 4" strokeOpacity={0.5} label={{ value: 'R', position: 'left', fill: 'var(--sig-short)', fontSize: 10 }} />
-              <ReferenceLine y={pivot.pivot} stroke="var(--accent-amber)" strokeDasharray="2 4" strokeOpacity={0.7} label={{ value: 'P', position: 'left', fill: 'var(--accent-amber)', fontSize: 10 }} />
-              <ReferenceLine y={pivot.support} stroke="var(--sig-long)" strokeDasharray="2 4" strokeOpacity={0.5} label={{ value: 'S', position: 'left', fill: 'var(--sig-long)', fontSize: 10 }} />
+              <ReferenceLine y={pivot.resistance} stroke="var(--sig-short)" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: 'R', position: 'left', fill: 'var(--sig-short)', fontSize: 11, fontWeight: 700 }} />
+              <ReferenceLine y={pivot.pivot} stroke="var(--overlay-pivot)" strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: 'P', position: 'left', fill: 'var(--overlay-pivot)', fontSize: 11, fontWeight: 700 }} />
+              <ReferenceLine y={pivot.support} stroke="var(--sig-long)" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: 'S', position: 'left', fill: 'var(--sig-long)', fontSize: 11, fontWeight: 700 }} />
             </>
           )}
 
           {/* Donchian bands (Strategy 15) */}
           {channel && (
             <>
-              <ReferenceLine y={channel.band_upper} stroke="var(--overlay-cyan)" strokeOpacity={0.4} strokeDasharray="4 2" />
-              <ReferenceLine y={channel.band_lower} stroke="var(--overlay-cyan)" strokeOpacity={0.4} strokeDasharray="4 2" />
+              <ReferenceLine y={channel.band_upper} stroke="var(--overlay-donchian)" strokeOpacity={0.5} strokeDasharray="6 3" />
+              <ReferenceLine y={channel.band_lower} stroke="var(--overlay-donchian)" strokeOpacity={0.5} strokeDasharray="6 3" />
             </>
           )}
 
-          <Line type="monotone" dataKey="close" stroke="var(--fg-primary)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="MA10" stroke="var(--overlay-cyan)" strokeWidth={1} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="MA20" stroke="var(--overlay-blue)" strokeWidth={1} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="MA50" stroke="var(--overlay-violet)" strokeWidth={1} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="close" stroke="var(--fg-primary)" strokeWidth={1.75} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="MA10" stroke="var(--overlay-cyan)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="MA20" stroke="var(--overlay-blue)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="MA50" stroke="var(--overlay-violet)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
 
           <Legend
             verticalAlign="top"
@@ -207,10 +210,10 @@ export default function ChartPanel({ data, signals, loading }) {
 
           <Brush
             dataKey="ts"
-            height={28}
-            stroke="var(--accent-amber-dim)"
-            fill="var(--bg-input)"
-            travellerWidth={6}
+            height={32}
+            stroke="var(--brush-stroke)"
+            fill="var(--brush-fill)"
+            travellerWidth={8}
             startIndex={window.start}
             endIndex={window.end}
             onChange={({ startIndex, endIndex }) => {
@@ -224,7 +227,7 @@ export default function ChartPanel({ data, signals, loading }) {
               <Line
                 type="monotone"
                 dataKey="close"
-                stroke="var(--fg-tertiary)"
+                stroke="var(--accent-blue)"
                 strokeWidth={1}
                 dot={false}
                 isAnimationActive={false}
