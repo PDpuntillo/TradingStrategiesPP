@@ -6,14 +6,13 @@ import LaneConfigPanel from './LaneConfigPanel'
 import styles from './Header.module.css'
 
 /*
- * Header — cinta superior tipo ticker tape.
- * Brand · tickers · timestamp · clear cache.
+ * Header — OS X-style toolbar, sticky en el top de la página.
  *
- * Props:
- *   tickers: TickerInfo[] — la lista viene del Dashboard (useTickers hook)
- *   selectedTicker: string | null
- *   onSelectTicker: (ticker) => void
- *   lastUpdated: ISO string
+ * Layout left → right:
+ *   [brand] · [+ ADD] [⚙ N/M] · [TICKERS scrolleables → shortcut a lane] · [clock] [CLEAR CACHE]
+ *
+ * Las ticker pills funcionan como anclas: click hace scrollIntoView de
+ * la lane correspondiente (id="lane-TICKER" en TickerLane).
  */
 export default function Header({
   tickers = [],
@@ -21,13 +20,12 @@ export default function Header({
   onSelectTicker,
   lastUpdated,
   onTickerAdded,
-  laneConfig,         // { config, toggleVisible, showAll, hideAll, moveTicker, resetOrder }
+  laneConfig,
 }) {
   const [clearing, setClearing] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [laneConfigOpen, setLaneConfigOpen] = useState(false)
 
-  // Tick cada 30s para refrescar el "ahora" del clock derecho
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000)
@@ -43,37 +41,33 @@ export default function Header({
     }
   }
 
+  const handleTickerClick = (ticker) => {
+    onSelectTicker?.(ticker)
+    const el = document.getElementById(`lane-${ticker}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
-        <svg width="14" height="14" viewBox="0 0 32 32" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
           <path
             d="M5 22 L11 14 L17 18 L27 8"
-            stroke="var(--accent-amber)"
+            stroke="var(--accent-blue)"
             strokeWidth="2.5"
             fill="none"
             strokeLinecap="square"
           />
-          <circle cx="27" cy="8" r="2" fill="var(--accent-amber)" />
+          <circle cx="27" cy="8" r="2" fill="var(--accent-blue)" />
         </svg>
         <span className={styles.brandName}>TRADINGSTRATEGYS</span>
         <span className={styles.brandSlash}>//</span>
         <span className={styles.brandSub}>PABLO · MERVAL</span>
       </div>
 
-      <nav className={styles.tickers} aria-label="Tickers">
-        {tickers.map((t) => (
-          <button
-            key={t.ticker}
-            className={`${styles.tickerBtn} ${
-              t.ticker === selectedTicker ? styles.tickerBtnActive : ''
-            }`}
-            onClick={() => onSelectTicker?.(t.ticker)}
-            title={t.name}
-          >
-            {t.ticker}.BA
-          </button>
-        ))}
+      <div className={styles.actions}>
         <button
           type="button"
           className={styles.addBtn}
@@ -92,7 +86,35 @@ export default function Header({
             ⚙ {laneConfig.config.visible.length}/{laneConfig.config.order.length}
           </button>
         )}
+      </div>
+
+      {/* Scrollable ticker shortcuts — separados de actions */}
+      <nav className={styles.tickerNav} aria-label="Tickers shortcuts">
+        <div className={styles.tickers}>
+          {tickers.map((t) => (
+            <button
+              key={t.ticker}
+              className={`${styles.tickerBtn} ${
+                t.ticker === selectedTicker ? styles.tickerBtnActive : ''
+              }`}
+              onClick={() => handleTickerClick(t.ticker)}
+              title={`Ir a ${t.name}`}
+            >
+              {t.ticker}.BA
+            </button>
+          ))}
+        </div>
       </nav>
+
+      <div className={styles.right}>
+        <span className={styles.label}>NOW</span>
+        <span className={`${styles.value} tabular`}>
+          {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </span>
+        <button className={styles.clearBtn} onClick={handleClear} disabled={clearing}>
+          {clearing ? '...' : 'CLEAR CACHE'}
+        </button>
+      </div>
 
       <AddTickerModal
         open={addOpen}
@@ -113,19 +135,6 @@ export default function Header({
           onReset={laneConfig.resetOrder}
         />
       )}
-
-      <div className={styles.right}>
-        <span className={styles.label}>last fetch</span>
-        <span className={`${styles.value} tabular`}>{fmt.ts(lastUpdated)}</span>
-        <span className={styles.divider} />
-        <span className={styles.label}>now</span>
-        <span className={`${styles.value} tabular`}>
-          {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </span>
-        <button className={styles.clearBtn} onClick={handleClear} disabled={clearing}>
-          {clearing ? '...' : 'CLEAR CACHE'}
-        </button>
-      </div>
     </header>
   )
 }

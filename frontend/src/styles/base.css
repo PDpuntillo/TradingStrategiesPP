@@ -70,26 +70,37 @@ input:hover, select:hover {
 }
 
 /* ===== Animaciones reusables ===== */
+:root {
+  --anim-overlay: 220ms;
+  --anim-modal:   320ms;
+  --anim-drawer:  340ms;
+  /* Easing con un toque de overshoot para que se sienta "físico" */
+  --ease-out-back: cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
 @keyframes overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 @keyframes modal-pop-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
+    transform: translate(-50%, -50%) scale(0.88);
   }
-  to {
+  60% {
+    opacity: 1;
+  }
+  100% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
 }
 @keyframes drawer-slide-right {
-  from { transform: translateX(100%); }
+  from { transform: translateX(105%); }
   to   { transform: translateX(0); }
 }
 @keyframes drawer-slide-left {
-  from { transform: translateX(-100%); }
+  from { transform: translateX(-105%); }
   to   { transform: translateX(0); }
 }
 

@@ -1,14 +1,16 @@
 /*
- * Header — OS X-style window toolbar.
- * Brushed aluminum gradient, white inset highlight at top, dark
- * hairline at bottom. Ticker pills become rounded segmented tabs.
+ * Header — OS X-style window toolbar, STICKY al top.
+ * Layout: [brand] [actions] [ticker scroll] [right meta]
  */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: var(--s-4);
   padding: var(--s-2) var(--s-4);
-  height: 52px;
+  height: 56px;
   background: var(--grad-toolbar);
   box-shadow: var(--shadow-toolbar);
   font-size: var(--fs-sm);
@@ -20,6 +22,7 @@
   gap: var(--s-2);
   padding-right: var(--s-3);
   border-right: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
 }
 
 .brandName {
@@ -40,11 +43,82 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-/* ===== Ticker pills como segmented control ===== */
-.tickers {
+/* ===== Actions (+ ADD / cog) === */
+.actions {
   display: flex;
-  gap: 1px;                                  /* hairline entre pills */
-  background: rgba(0, 0, 0, 0.18);           /* el divider entre pills */
+  gap: var(--s-2);
+  padding-right: var(--s-3);
+  border-right: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+
+.addBtn,
+.cogBtn {
+  padding: var(--s-1) var(--s-3);
+  background: var(--grad-toolbar-active);
+  color: var(--fg-secondary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-aqua-btn);
+  text-transform: uppercase;
+  transition: filter var(--t-fast) var(--ease);
+}
+
+.addBtn:hover,
+.cogBtn:hover {
+  filter: brightness(1.04);
+}
+
+.addBtn:active,
+.cogBtn:active {
+  box-shadow: var(--shadow-aqua-btn-active);
+  filter: brightness(0.95);
+}
+
+/* ===== Ticker shortcuts (scrolleables) ===== */
+.tickerNav {
+  flex: 1;
+  min-width: 0;          /* importante para que overflow-x funcione en grid/flex */
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Scrollbar muy sutil */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  /* Fade hint a los costados para que se vea que hay más */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+.tickerNav::-webkit-scrollbar {
+  height: 4px;
+}
+.tickerNav::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--r-pill);
+}
+.tickerNav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tickers {
+  display: inline-flex;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.18);
   padding: 1px;
   border-radius: var(--r-md);
   box-shadow:
@@ -60,6 +134,8 @@
   font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  white-space: nowrap;
   transition: filter var(--t-fast) var(--ease);
 }
 
@@ -89,39 +165,14 @@
   filter: none;
 }
 
-/* ===== + ADD y ⚙ buttons (capsule-y) ===== */
-.addBtn,
-.cogBtn {
-  padding: var(--s-1) var(--s-3);
-  background: var(--grad-toolbar-active);
-  color: var(--fg-secondary);
-  font-weight: var(--weight-semibold);
-  font-size: var(--fs-xs);
-  letter-spacing: var(--tracking-wide);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-aqua-btn);
-  margin-left: var(--s-2);
-  transition: filter var(--t-fast) var(--ease);
-}
-
-.addBtn:hover,
-.cogBtn:hover {
-  filter: brightness(1.04);
-}
-
-.addBtn:active,
-.cogBtn:active {
-  box-shadow: var(--shadow-aqua-btn-active);
-  filter: brightness(0.95);
-}
-
-/* ===== Right meta ===== */
+/* ===== Right meta (clock + CLEAR CACHE) ===== */
 .right {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  padding-left: var(--s-3);
+  border-left: 1px solid rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
 }
 
 .label {
@@ -138,16 +189,8 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-.divider {
-  width: 1px;
-  height: 14px;
-  background: rgba(0, 0, 0, 0.18);
-  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.6);
-  margin: 0 var(--s-2);
-}
-
 .clearBtn {
-  margin-left: var(--s-3);
+  margin-left: var(--s-2);
   padding: var(--s-1) var(--s-3);
   background: var(--grad-toolbar-active);
   color: var(--fg-secondary);
@@ -156,6 +199,8 @@
   font-size: var(--fs-micro);
   letter-spacing: var(--tracking-wide);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
   transition: filter var(--t-fast) var(--ease);
 }
 

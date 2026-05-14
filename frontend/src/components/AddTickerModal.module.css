@@ -5,7 +5,7 @@
   background: rgba(0, 0, 0, 0.30);
   backdrop-filter: blur(2px);
   z-index: 70;
-  animation: overlay-in var(--t-base) var(--ease);
+  animation: overlay-in var(--anim-overlay) var(--ease);
 }
 
 .modal {
@@ -22,7 +22,7 @@
   flex-direction: column;
   z-index: 71;
   overflow: hidden;
-  animation: modal-pop-in var(--t-base) var(--ease);
+  animation: modal-pop-in var(--anim-modal) var(--ease-out-back);
 }
 
 .head {
@@ -127,6 +127,7 @@
   font-size: var(--fs-sm);
   letter-spacing: var(--tracking-wide);
   font-weight: var(--weight-semibold);
+  text-transform: uppercase;
 }
 
 .cancel {
@@ -231,6 +232,7 @@
   font-weight: var(--weight-semibold);
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2);
   box-shadow: var(--shadow-aqua-btn);
+  text-transform: uppercase;
 }
 
 .copyBtn:hover {

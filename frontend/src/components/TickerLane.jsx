@@ -24,7 +24,7 @@ export default function TickerLane({ ticker, tickerName, onOpenStrategy }) {
   const delta = last && prev ? (last - prev) / prev : null
 
   return (
-    <article className={styles.lane}>
+    <article id={`lane-${ticker}`} className={styles.lane}>
       <header className={styles.head}>
         <span className={styles.ticker} title={tickerName}>{ticker}.BA</span>
         <span className={`${styles.price} tabular`}>{fmt.price(last)}</span>
