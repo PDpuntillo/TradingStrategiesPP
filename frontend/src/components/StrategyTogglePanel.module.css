@@ -4,6 +4,14 @@
  * absoluto desde el borde izquierdo, ocupa la altura del lane body.
  * Sin overlay backdrop.
  */
+/* Click-catcher transparente */
+.localOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: default;
+}
+
 .panel {
   position: absolute;
   top: 0;
@@ -13,8 +21,9 @@
   max-width: 100%;
   background: var(--bg-card);
   box-shadow:
-    8px 0 24px rgba(0, 0, 0, 0.20),
-    inset -1px 0 0 rgba(0, 0, 0, 0.12);
+    14px 0 32px rgba(0, 0, 0, 0.28),
+    6px 0 12px rgba(0, 0, 0, 0.15),
+    inset -1px 0 0 rgba(0, 0, 0, 0.20);
   display: flex;
   flex-direction: column;
   z-index: 5;

@@ -73,7 +73,7 @@ input:hover, select:hover {
 :root {
   --anim-overlay: 220ms;
   --anim-modal:   320ms;
-  --anim-drawer:  340ms;
+  --anim-drawer:  500ms;          /* slow enough para que se aprecie el slide */
   /* Easing con un toque de overshoot para que se sienta "físico" */
   --ease-out-back: cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }

@@ -20,7 +20,9 @@ export default function StrategyTogglePanel({
   if (!open) return null
 
   return (
-    <aside className={styles.panel} role="dialog" aria-label="Toggle strategies">
+    <>
+      <div className={styles.localOverlay} onClick={onClose} aria-hidden />
+      <aside className={styles.panel} role="dialog" aria-label="Toggle strategies">
         <header className={styles.head}>
           <div>
             <div className={styles.eyebrow}>ESTRATEGIAS ACTIVAS</div>
@@ -60,6 +62,7 @@ export default function StrategyTogglePanel({
             en el consensus.
           </span>
         </footer>
-    </aside>
+      </aside>
+    </>
   )
 }
