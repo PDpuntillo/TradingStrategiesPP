@@ -5,6 +5,7 @@
   background: rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(2px);
   z-index: 50;
+  animation: overlay-in var(--t-base) var(--ease);
 }
 
 .drawer {
@@ -21,6 +22,7 @@
   flex-direction: column;
   z-index: 51;
   overflow-y: auto;
+  animation: drawer-slide-right var(--t-base) var(--ease);
 }
 
 .head {

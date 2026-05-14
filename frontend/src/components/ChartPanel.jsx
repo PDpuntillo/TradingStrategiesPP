@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
+  ComposedChart,
   LineChart,
   Line,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,23 +28,20 @@ const PERIODS = [
 ]
 
 /*
- * ChartPanel — precio + MAs + bandas (Donchian) + pivot.
+ * ChartPanel — velas OHLC + MAs + Pivot/Donchian.
  *
- * Pasamos la SERIE COMPLETA al LineChart y controlamos el viewport con
- * <Brush> (mini-strip abajo). Los botones de período son presets que
- * setean la ventana del brush; después el usuario puede arrastrar para
- * pan/resize manual sin cambiar de período.
+ * Las velas se dibujan con un Bar de Recharts + custom shape que renderea
+ * SVG (rect body + line wick), sin depender de librerías externas.
  *
- * Convención de terminal: eje Y a la DERECHA, grid casi invisible.
+ * Pasamos la SERIE COMPLETA al ComposedChart y controlamos el viewport
+ * con <Brush>. Los botones de período son presets que setean la ventana;
+ * después el usuario puede arrastrar el brush para pan/resize manual.
  */
 export default function ChartPanel({ data, signals, loading }) {
   const [period, setPeriod] = useState('6M')
-  // Escala del eje Y: 'linear' o 'log'. Log es útil para ver cambios
-  // porcentuales constantes a la misma altura visual (ej. duplicaciones).
   const [scale, setScale] = useState('linear')
 
-  // Serie COMPLETA con MAs computadas sobre todo (preciso desde
-  // el primer bar visible al hacer pan).
+  // Serie completa con O/H/L/C + MAs
   const series = useMemo(() => {
     if (!data?.bars) return []
     const closes = data.bars.map((b) => b.close)
@@ -57,18 +56,20 @@ export default function ChartPanel({ data, signals, loading }) {
     const ma3 = ma(50)
     return data.bars.map((b, i) => ({
       ts: b.timestamp,
+      open: b.open,
+      high: b.high,
+      low: b.low,
       close: b.close,
+      // dataKey para el Bar de velas: [low, high] = rango total del candle
+      hl: [b.low, b.high],
       MA10: ma1(i),
       MA20: ma2(i),
       MA50: ma3(i),
     }))
   }, [data])
 
-  // Ventana visible (índices al array completo). Se inicializa con el
-  // período seleccionado y se updatea cuando el usuario mueve el brush.
   const [window, setWindow] = useState({ start: 0, end: 0 })
 
-  // Snap a período cuando cambia (botón clickeado o data nueva).
   useEffect(() => {
     if (!series.length) return
     const cfg = PERIODS.find((p) => p.key === period) ?? PERIODS[2]
@@ -77,19 +78,19 @@ export default function ChartPanel({ data, signals, loading }) {
     setWindow({ start: total - bars, end: total - 1 })
   }, [period, series.length])
 
-  // Para que el YAxis se auto-ajuste al subset visible (Recharts NO lo
-  // hace nativo cuando hay Brush en algunas configs), calculamos el
-  // domain a partir de la ventana actual.
   const visibleSlice = useMemo(() => {
     if (!series.length) return []
     return series.slice(window.start, window.end + 1)
   }, [series, window])
 
+  // YAxis domain: usar high/low (no close) para que las wicks de las
+  // velas entren bien
   const yDomain = useMemo(() => {
     if (!visibleSlice.length) return ['auto', 'auto']
     const vals = []
     for (const r of visibleSlice) {
-      if (r.close != null) vals.push(r.close)
+      if (r.high != null) vals.push(r.high)
+      if (r.low != null) vals.push(r.low)
       if (r.MA10 != null) vals.push(r.MA10)
       if (r.MA20 != null) vals.push(r.MA20)
       if (r.MA50 != null) vals.push(r.MA50)
@@ -97,16 +98,13 @@ export default function ChartPanel({ data, signals, loading }) {
     if (!vals.length) return ['auto', 'auto']
     const min = Math.min(...vals)
     const max = Math.max(...vals)
-    // Padding del 3% para que la línea no toque el borde
     const pad = (max - min) * 0.03 || max * 0.01
     if (scale === 'log') {
-      // Log no acepta negativos ni 0; clampear min a algo > 0
       return [Math.max(min - pad, min * 0.97), max + pad]
     }
     return [min - pad, max + pad]
   }, [visibleSlice, scale])
 
-  // Bandas Donchian (S15) y pivots (S14) como ReferenceLines horizontales
   const channel = signals?.strategy_15
   const pivot = signals?.strategy_14
 
@@ -150,7 +148,7 @@ export default function ChartPanel({ data, signals, loading }) {
         </div>
       </div>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={series} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+        <ComposedChart data={series} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <CartesianGrid stroke="var(--overlay-grid)" strokeDasharray="0" vertical={false} />
           <XAxis
             dataKey="ts"
@@ -178,7 +176,6 @@ export default function ChartPanel({ data, signals, loading }) {
             cursor={{ stroke: 'var(--accent-blue)', strokeOpacity: 0.5, strokeWidth: 1 }}
           />
 
-          {/* Pivot / S / R como líneas horizontales (Strategy 14) */}
           {pivot && (
             <>
               <ReferenceLine y={pivot.resistance} stroke="var(--sig-short)" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: 'R', position: 'left', fill: 'var(--sig-short)', fontSize: 11, fontWeight: 700 }} />
@@ -187,7 +184,6 @@ export default function ChartPanel({ data, signals, loading }) {
             </>
           )}
 
-          {/* Donchian bands (Strategy 15) */}
           {channel && (
             <>
               <ReferenceLine y={channel.band_upper} stroke="var(--overlay-donchian)" strokeOpacity={0.5} strokeDasharray="6 3" />
@@ -195,7 +191,16 @@ export default function ChartPanel({ data, signals, loading }) {
             </>
           )}
 
-          <Line type="monotone" dataKey="close" stroke="var(--fg-primary)" strokeWidth={1.75} dot={false} isAnimationActive={false} />
+          {/* Velas — Bar con custom shape. dataKey "hl" da el rango low-high
+              al shape como [y_high_pixel, y_low_pixel], y leemos open/close
+              del payload para dibujar el body. */}
+          <Bar
+            dataKey="hl"
+            shape={<Candle />}
+            isAnimationActive={false}
+            legendType="none"
+          />
+
           <Line type="monotone" dataKey="MA10" stroke="var(--overlay-cyan)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
           <Line type="monotone" dataKey="MA20" stroke="var(--overlay-blue)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
           <Line type="monotone" dataKey="MA50" stroke="var(--overlay-violet)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
@@ -234,8 +239,84 @@ export default function ChartPanel({ data, signals, loading }) {
               />
             </LineChart>
           </Brush>
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
+  )
+}
+
+/*
+ * Candle — custom shape para el Bar de Recharts.
+ *
+ * Recharts pasa al shape: x, y, width, height (basados en el dataKey "hl"
+ * que es [low, high], así que y = pixel de high, y+height = pixel de low),
+ * más el payload completo de la row.
+ *
+ * Computamos open/close en pixels via ratio = height / (high - low),
+ * dibujamos:
+ *   - wick line vertical de high a low (centerX)
+ *   - body rect de min(open,close) a max(open,close), ancho ~70% del slot
+ *
+ * Color: verde si close >= open (bullish), rojo si close < open (bearish).
+ */
+function Candle(props) {
+  const { x, y, width, height, payload } = props
+  if (!payload) return null
+  const { open, high, low, close } = payload
+  if (open == null || close == null || high == null || low == null) return null
+
+  const range = high - low
+  if (range <= 0) {
+    // doji o sin spread — solo dibuja una línea horizontal en el body
+    const cx = x + width / 2
+    const bodyWidth = Math.max(2, width * 0.7)
+    return (
+      <line
+        x1={cx - bodyWidth / 2}
+        y1={y + height / 2}
+        x2={cx + bodyWidth / 2}
+        y2={y + height / 2}
+        stroke="var(--fg-secondary)"
+        strokeWidth={1.5}
+      />
+    )
+  }
+
+  const isUp = close >= open
+  const color = isUp ? 'var(--sig-long)' : 'var(--sig-short)'
+
+  const ratio = height / range
+  const openY = y + (high - open) * ratio
+  const closeY = y + (high - close) * ratio
+  const bodyTop = Math.min(openY, closeY)
+  const bodyBottom = Math.max(openY, closeY)
+  const bodyHeight = Math.max(1, bodyBottom - bodyTop)
+
+  const centerX = x + width / 2
+  const bodyWidth = Math.max(2, width * 0.7)
+  const bodyX = centerX - bodyWidth / 2
+
+  return (
+    <g>
+      {/* Wick: vertical line from high to low */}
+      <line
+        x1={centerX}
+        y1={y}
+        x2={centerX}
+        y2={y + height}
+        stroke={color}
+        strokeWidth={1}
+      />
+      {/* Body: rect from open to close */}
+      <rect
+        x={bodyX}
+        y={bodyTop}
+        width={bodyWidth}
+        height={bodyHeight}
+        fill={color}
+        stroke={color}
+        strokeWidth={1}
+      />
+    </g>
   )
 }

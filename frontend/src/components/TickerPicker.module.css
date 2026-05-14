@@ -4,6 +4,7 @@
   background: rgba(0, 0, 0, 0.30);
   backdrop-filter: blur(2px);
   z-index: 60;
+  animation: overlay-in var(--t-base) var(--ease);
 }
 
 .modal {
@@ -20,6 +21,7 @@
   flex-direction: column;
   z-index: 61;
   overflow: hidden;
+  animation: modal-pop-in var(--t-base) var(--ease);
 }
 
 .head {
