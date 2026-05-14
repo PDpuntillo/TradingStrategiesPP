@@ -52,6 +52,7 @@
 
 .body {
   display: flex;
-  min-height: 280px;
-  height: 320px;
+  min-height: 320px;
+  /* +50px sobre el original 320 para acomodar el Brush (28px) + period bar */
+  height: 370px;
 }
