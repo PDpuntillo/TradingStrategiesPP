@@ -150,6 +150,13 @@ def is_ticker_available(ticker: str) -> bool:
     return ticker.upper() in merged_sheet_ids()
 
 
+def get_sector(ticker: str) -> Optional[str]:
+    """Devuelve el sector del ticker según tickers_meta.json, o None si no figura."""
+    meta = _load_meta()
+    entry = meta.get(ticker.upper())
+    return entry.get("sector") if entry else None
+
+
 def add_local_ticker(ticker: str, sheet_id_or_url: str) -> dict:
     """
     Agrega un ticker al sheet_ids_local.json (dev-only).

@@ -302,3 +302,36 @@ class PairsOutput(BaseModel):
     positions: List[PairsPosition]   # exactamente 2 items
     total_investment: float
     timestamp: datetime
+
+
+class MeanReversionInput(BaseModel):
+    """Input para Mean Reversion (paper #9 single, #10 multiple clusters)."""
+    tickers: List[Ticker]
+    lookback_days: int = Field(default=63, ge=21, le=504)
+    total_investment: float = Field(default=10000.0, gt=0)
+    # Si True, agrupa tickers por sector (de tickers_meta.json) — paper #10
+    # Si False, trata todos como un único cluster — paper #9
+    use_clusters: bool = False
+
+
+class MeanReversionPosition(BaseModel):
+    """Posición de un ticker en mean-reversion."""
+    ticker: Ticker
+    cluster: Optional[str] = None     # sector si use_clusters=True
+    log_return: float
+    demeaned_return: float            # R_i - mean del cluster
+    dollar_position: float            # signed: positive=long, negative=short
+    signal: SignalType
+
+
+class MeanReversionOutput(BaseModel):
+    """Output de Mean Reversion."""
+    strategy_name: str = "mean_reversion"
+    use_clusters: bool
+    n_clusters: int
+    n_tickers: int                    # rankeados (con datos)
+    n_skipped: int                    # sin data
+    lookback_days: int
+    total_investment: float
+    positions: List[MeanReversionPosition]
+    timestamp: datetime

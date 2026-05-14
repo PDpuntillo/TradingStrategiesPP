@@ -320,6 +320,25 @@
   letter-spacing: var(--tracking-wide);
 }
 
+/* ===== Mean Reversion (grouped by cluster) ===== */
+.mrCluster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.mrClusterHead {
+  font-size: var(--fs-micro);
+  color: var(--accent-amber);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 700;
+  padding: var(--s-2) var(--s-3);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-soft);
+  border-bottom: none;
+}
+
 .error {
   padding: var(--s-2) var(--s-3);
   border: 1px solid var(--sig-short);

@@ -36,6 +36,8 @@ from app.models.strategy import (
     MultifactorInput,
     PairsInput,
     PairsPosition, PairsOutput,
+    MeanReversionInput,
+    MeanReversionPosition, MeanReversionOutput,
 )
 
 
@@ -852,6 +854,139 @@ def pairs_trading(
         mean_return=R_mean,
         positions=positions,
         total_investment=params.total_investment,
+        timestamp=datetime.now(),
+    )
+
+
+# ============================================
+# CROSS-SECTIONAL #9/#10: MEAN REVERSION (single + multiple clusters)
+# ============================================
+def mean_reversion(
+    bars_by_ticker: dict,
+    sectors_by_ticker: dict,         # {ticker: sector_name or None}
+    params: MeanReversionInput,
+) -> MeanReversionOutput:
+    """
+    Paper #9 (single cluster) / #10 (multiple clusters) — Mean Reversion.
+
+    Para un cluster (set de tickers correlacionados, ej. mismo sector):
+        R_i           = log return de i sobre la ventana
+        R_mean        = (1/N) * sum(R_i)
+        R_tilde_i     = R_i - R_mean             (demeaned)
+        gamma         = I_cluster / sum(|R_tilde_i|)
+        D_i           = -gamma * R_tilde_i        (posición en dólares)
+
+    El signo negativo es la "reversion": shortemos los que subieron más
+    que el cluster mean, longemos los que subieron menos. Cuando converjan
+    al mean, hacemos profit.
+
+    use_clusters=False → un cluster con todos los tickers (paper #9)
+    use_clusters=True  → grupos por sector de tickers_meta.json (paper #10)
+
+    La inversión se reparte equally entre los clusters non-empty.
+    """
+    # Construir clusters
+    if params.use_clusters:
+        clusters: dict = {}  # cluster_name → [ticker, ...]
+        for ticker in bars_by_ticker.keys():
+            sector = sectors_by_ticker.get(ticker) or "Sin clasificar"
+            clusters.setdefault(sector, []).append(ticker)
+    else:
+        clusters = {None: list(bars_by_ticker.keys())}
+
+    needed = params.lookback_days + 1
+    positions: List[MeanReversionPosition] = []
+    n_skipped = 0
+    # Solo contamos los clusters con >=2 tickers usables para repartir investment
+    usable_clusters = []
+    cluster_returns: dict = {}  # cluster_name → {ticker: log_return}
+
+    for cluster_name, cluster_tickers in clusters.items():
+        returns: dict = {}
+        for t in cluster_tickers:
+            bars = bars_by_ticker.get(t, [])
+            if len(bars) < needed:
+                continue
+            closes = np.array([b.close for b in bars[-needed:]], dtype=float)
+            if closes[0] <= 0:
+                continue
+            returns[t] = float(np.log(closes[-1] / closes[0]))
+        cluster_returns[cluster_name] = returns
+        if len(returns) >= 2:
+            usable_clusters.append(cluster_name)
+
+    investment_per_cluster = (
+        params.total_investment / len(usable_clusters) if usable_clusters else 0.0
+    )
+
+    for cluster_name, cluster_tickers in clusters.items():
+        returns = cluster_returns[cluster_name]
+        if len(returns) < 2:
+            # cluster muy chico — todos HOLD
+            for t in cluster_tickers:
+                if t in returns:
+                    positions.append(MeanReversionPosition(
+                        ticker=t, cluster=cluster_name,
+                        log_return=returns[t],
+                        demeaned_return=0.0,
+                        dollar_position=0.0,
+                        signal=SignalType.HOLD,
+                    ))
+                else:
+                    n_skipped += 1
+                    positions.append(MeanReversionPosition(
+                        ticker=t, cluster=cluster_name,
+                        log_return=0.0,
+                        demeaned_return=0.0,
+                        dollar_position=0.0,
+                        signal=SignalType.HOLD,
+                    ))
+            continue
+
+        mean_R = sum(returns.values()) / len(returns)
+        demeaned = {t: R - mean_R for t, R in returns.items()}
+        abs_sum = sum(abs(d) for d in demeaned.values())
+        gamma = investment_per_cluster / abs_sum if abs_sum > 0 else 0.0
+
+        for t in cluster_tickers:
+            if t not in returns:
+                n_skipped += 1
+                positions.append(MeanReversionPosition(
+                    ticker=t, cluster=cluster_name,
+                    log_return=0.0, demeaned_return=0.0,
+                    dollar_position=0.0, signal=SignalType.HOLD,
+                ))
+                continue
+            rt = demeaned[t]
+            pos = -gamma * rt  # NEGATIVE: shortemos los outperformers
+            if pos > 0.01:
+                sig = SignalType.LONG
+            elif pos < -0.01:
+                sig = SignalType.SHORT
+            else:
+                sig = SignalType.HOLD
+            positions.append(MeanReversionPosition(
+                ticker=t, cluster=cluster_name,
+                log_return=returns[t],
+                demeaned_return=rt,
+                dollar_position=pos,
+                signal=sig,
+            ))
+
+    # Ordenar: por cluster, dentro de cada cluster por dollar_position desc
+    positions.sort(key=lambda p: (p.cluster or "", -p.dollar_position))
+
+    n_tickers = sum(1 for p in positions if p.dollar_position != 0.0)
+
+    return MeanReversionOutput(
+        strategy_name="mean_reversion",
+        use_clusters=params.use_clusters,
+        n_clusters=len(usable_clusters),
+        n_tickers=n_tickers,
+        n_skipped=n_skipped,
+        lookback_days=params.lookback_days,
+        total_investment=params.total_investment,
+        positions=positions,
         timestamp=datetime.now(),
     )
 

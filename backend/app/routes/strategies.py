@@ -18,6 +18,7 @@ from app.models.strategy import (
     Strategy18Input, Strategy18Output,
     PriceMomentumInput, LowVolatilityInput, ValueInput, MultifactorInput,
     PairsInput, PairsOutput,
+    MeanReversionInput, MeanReversionOutput,
     CrossRankingOutput,
 )
 from app.services.sheets_service import SheetsService, get_sheets_service
@@ -25,7 +26,7 @@ from app.services.strategy_service import (
     strategy_11, strategy_12, strategy_13,
     strategy_14, strategy_15, strategy_18,
     price_momentum, low_volatility, value_strategy, multifactor,
-    pairs_trading,
+    pairs_trading, mean_reversion,
     compute_consensus_signal,
 )
 from app.services.tickers_service import (
@@ -33,6 +34,7 @@ from app.services.tickers_service import (
     list_all_tickers_meta,
     is_ticker_available,
     add_local_ticker,
+    get_sector,
 )
 from pydantic import BaseModel
 
@@ -398,6 +400,34 @@ def run_pairs(
         )
 
     return pairs_trading(data_a.bars, data_b.bars, params)
+
+
+# ============================================
+# CROSS-SECTIONAL #9/#10: MEAN REVERSION
+# ============================================
+@router.post("/cross/mean_reversion", response_model=MeanReversionOutput)
+def run_mean_reversion(
+    params: MeanReversionInput,
+    sheets: SheetsService = Depends(get_sheets_service),
+):
+    """Mean Reversion (paper #9 single cluster, #10 multiple clusters por sector)."""
+    if len(params.tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Mean reversion requiere al menos 2 tickers",
+        )
+    normalized = [_validate_ticker(t) for t in params.tickers]
+    params.tickers = normalized
+
+    needed = params.lookback_days + 1
+    bars_by_ticker = {}
+    sectors_by_ticker = {}
+    for ticker in normalized:
+        data = sheets.get_raw_data(ticker, limit=needed + 50)
+        bars_by_ticker[ticker] = data.bars
+        sectors_by_ticker[ticker] = get_sector(ticker)
+
+    return mean_reversion(bars_by_ticker, sectors_by_ticker, params)
 
 
 # ============================================

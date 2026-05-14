@@ -47,9 +47,12 @@ const STRATS = [
     description: 'Dos tickers correlacionados: cuando uno overperforma vs el promedio del par, está "rich" → SHORT, el otro "cheap" → LONG. Dollar-neutral.',
     paperRef: 'paper #8',
   },
-  // Próximas en commits siguientes:
-  // { id: 'mr_single', ... },
-  // { id: 'mr_multiple', ... },
+  {
+    id: 'mean_reversion',
+    label: 'MEAN REVERSION',
+    description: 'Generalización de pairs a N tickers correlacionados. Toggle "use clusters" para agrupar por sector (paper #10) en vez de un único cluster (paper #9). Shortemos los outperformers vs cluster mean, longemos los underperformers — esperando que reviertan.',
+    paperRef: 'paper #9 / #10',
+  },
 ]
 
 export default function CrossSectionalPanel({ availableTickers = [] }) {
@@ -129,6 +132,12 @@ export default function CrossSectionalPanel({ availableTickers = [] }) {
         )}
         {activeId === 'pairs' && (
           <PairsRunner availableTickers={availableTickers} />
+        )}
+        {activeId === 'mean_reversion' && (
+          <MeanReversionRunner
+            tickers={selectedTickers}
+            availableTickers={availableTickers}
+          />
         )}
       </div>
 
@@ -599,6 +608,151 @@ function PairsCard({ data }) {
       <div className={styles.resultMeta}>
         total {fmt.price(total_investment)} · ts {fmt.ts(timestamp)}
       </div>
+    </div>
+  )
+}
+
+
+// ============================================
+// Sub-component: Mean Reversion runner
+// ============================================
+function MeanReversionRunner({ tickers }) {
+  const { data, loading, error, run } = useCrossStrategy('mean_reversion')
+  const [lookback, setLookback] = useState(63)
+  const [investment, setInvestment] = useState(10000)
+  const [useClusters, setUseClusters] = useState(false)
+
+  const handleRun = (e) => {
+    e.preventDefault()
+    if (tickers.length < 2) return
+    run({
+      tickers,
+      lookback_days: lookback,
+      total_investment: investment,
+      use_clusters: useClusters,
+    })
+  }
+
+  return (
+    <>
+      <form className={styles.form} onSubmit={handleRun}>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            LOOKBACK (días) <span className={styles.bounds}>[21 — 504]</span>
+          </label>
+          <input
+            type="number"
+            min={21}
+            max={504}
+            step={1}
+            value={lookback}
+            onChange={(e) => setLookback(parseInt(e.target.value, 10))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.lbl}>
+            INVERSIÓN TOTAL <span className={styles.bounds}>(reparte entre clusters)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            step="any"
+            value={investment}
+            onChange={(e) => setInvestment(parseFloat(e.target.value) || 0)}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.switchField}`}>
+          <label className={styles.lbl}>
+            USE CLUSTERS <span className={styles.bounds}>(por sector)</span>
+          </label>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={useClusters}
+            className={`${styles.switch} ${useClusters ? styles.switchOn : ''}`}
+            onClick={() => setUseClusters((v) => !v)}
+          >
+            <span className={styles.switchKnob} />
+          </button>
+        </div>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={loading || tickers.length < 2}
+        >
+          {loading ? 'CALCULANDO…' : 'CALCULAR'}
+        </button>
+      </form>
+
+      {tickers.length < 2 && (
+        <div className={styles.warning}>Seleccioná al menos 2 tickers.</div>
+      )}
+      {error && <div className={styles.error}>{String(error.message ?? error)}</div>}
+      {data && <MeanReversionTable data={data} />}
+    </>
+  )
+}
+
+function MeanReversionTable({ data }) {
+  // Agrupar por cluster
+  const byCluster = data.positions.reduce((acc, p) => {
+    const key = p.cluster ?? 'TODOS'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(p)
+    return acc
+  }, {})
+  const clusterOrder = Object.keys(byCluster).sort()
+
+  return (
+    <div className={styles.result}>
+      <div className={styles.resultMeta}>
+        <span>{data.n_clusters} cluster(s) usables</span>
+        <span className={styles.muted}> · {data.n_tickers} tickers con posición</span>
+        {data.n_skipped > 0 && (
+          <span className={styles.muted}> · {data.n_skipped} sin data</span>
+        )}
+        <span className={styles.muted}> · total {fmt.price(data.total_investment)}</span>
+        <span className={styles.muted}> · ts {fmt.ts(data.timestamp)}</span>
+      </div>
+
+      {clusterOrder.map((cluster) => (
+        <div key={cluster} className={styles.mrCluster}>
+          <div className={styles.mrClusterHead}>
+            {data.use_clusters ? `CLUSTER · ${cluster}` : 'TODOS LOS TICKERS'}
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th className={styles.numCol}>RETURN</th>
+                  <th className={styles.numCol}>DEMEANED</th>
+                  <th className={styles.numCol}>POSITION</th>
+                  <th>SIGNAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byCluster[cluster].map((p) => (
+                  <tr
+                    key={p.ticker}
+                    style={{ '--row-color': signalColor(p.signal) }}
+                  >
+                    <td className={styles.tickerCell}>{p.ticker}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.pct(p.log_return)}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.pct(p.demeaned_return)}</td>
+                    <td className={`${styles.numCol} tabular`}>{fmt.price(p.dollar_position)}</td>
+                    <td className={styles.signalCell}>
+                      <span style={{ color: signalColor(p.signal) }}>
+                        {signalGlyph(p.signal)} {p.signal}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
