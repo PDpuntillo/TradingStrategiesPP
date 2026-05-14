@@ -18,8 +18,9 @@ from app.models.strategy import Ticker, PriceBar, TickerData
 
 logger = logging.getLogger(__name__)
 
-# Timeout más alto para tolerar latencia ocasional de Google bajo carga.
-_HTTP_TIMEOUT_SECONDS = 30
+# Timeout más alto para tolerar latencia ocasional de Google bajo carga
+# (60s en vez de 30s cubre cold-start lento + ocasional latencia de la API).
+_HTTP_TIMEOUT_SECONDS = 60
 # Cuánto esperan los waiters cuando otro thread está haciendo el fetch.
 # 90s: cubre cold-start de Render free (~40-60s para levantar el dyno)
 # + el fetch real a Google (~1-2s). En local/instances always-on alcanza con
@@ -58,6 +59,13 @@ class SheetsService:
         # In-flight request dedup: key → Event signaled when fetch resolves
         self._in_flight: dict[str, threading.Event] = {}
         self._in_flight_lock = threading.Lock()
+        # Global lock alrededor de cada call a la Google API. CRÍTICO:
+        # googleapiclient (httplib2 abajo) NO es thread-safe; sharear un
+        # Http() entre threads corrompe memoria → SIGABRT del dyno.
+        # Ver https://github.com/googleapis/google-api-python-client/blob/main/docs/thread_safety.md
+        # Combinado con la dedup por key, la contención real es baja: cada
+        # key única solo hace 1 call a Google.
+        self._api_lock = threading.Lock()
 
     def _get_spreadsheet_id(self, ticker: Ticker) -> str:
         """Resuelve el spreadsheet_id desde el ticker."""
@@ -120,12 +128,16 @@ class SheetsService:
         spreadsheet_id = self._get_spreadsheet_id(ticker)
         full_range = f"{sheet_name}!{cell_range}"
         try:
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=full_range)
-                .execute()
-            )
+            # Lock global: googleapiclient/httplib2 NO son thread-safe.
+            # Sin esto, llamadas simultáneas para keys distintas (GGAL/YPF/PAMP)
+            # corrompen el estado interno del Http compartido → segfault.
+            with self._api_lock:
+                result = (
+                    self.service.spreadsheets()
+                    .values()
+                    .get(spreadsheetId=spreadsheet_id, range=full_range)
+                    .execute()
+                )
             values = result.get("values", [])
             self._cache[cache_key] = values
             logger.info(f"Sheets READ: {ticker.value}/{sheet_name} ({len(values)} rows)")
@@ -159,6 +171,11 @@ class SheetsService:
         bars: List[PriceBar] = []
         for row in rows:
             if len(row) < 6:
+                continue
+            # GOOGLEFINANCE inserta su propio header en la 1ra fila de su output
+            # (['Date','Open','High','Low','Close','Volume']). Lo skipeamos
+            # silencioso — no es una "row inválida", es comportamiento esperado.
+            if row[0] == "Date" and row[1] == "Open":
                 continue
             try:
                 bars.append(
