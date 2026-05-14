@@ -34,6 +34,9 @@ const PERIODS = [
  */
 export default function ChartPanel({ data, signals, loading }) {
   const [period, setPeriod] = useState('6M')
+  // Escala del eje Y: 'linear' o 'log'. Log es útil para ver cambios
+  // porcentuales constantes a la misma altura visual (ej. duplicaciones).
+  const [scale, setScale] = useState('linear')
 
   const series = useMemo(() => {
     if (!data?.bars) return []
@@ -88,6 +91,24 @@ export default function ChartPanel({ data, signals, loading }) {
             {p.label}
           </button>
         ))}
+        <div className={styles.scaleGroup}>
+          <button
+            type="button"
+            className={`${styles.periodBtn} ${scale === 'linear' ? styles.periodBtnActive : ''}`}
+            onClick={() => setScale('linear')}
+            title="Escala lineal (default)"
+          >
+            LIN
+          </button>
+          <button
+            type="button"
+            className={`${styles.periodBtn} ${scale === 'log' ? styles.periodBtnActive : ''}`}
+            onClick={() => setScale('log')}
+            title="Escala logarítmica (mejor para movimientos % constantes)"
+          >
+            LOG
+          </button>
+        </div>
       </div>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
@@ -108,7 +129,9 @@ export default function ChartPanel({ data, signals, loading }) {
             tickLine={false}
             axisLine={{ stroke: 'var(--border)' }}
             tickFormatter={(v) => fmt.price(v)}
-            domain={['auto', 'auto']}
+            scale={scale}
+            domain={scale === 'log' ? ['dataMin', 'dataMax'] : ['auto', 'auto']}
+            allowDataOverflow={scale === 'log'}
             width={64}
           />
           <Tooltip content={<AmberReadout />} cursor={{ stroke: 'var(--accent-amber)', strokeOpacity: 0.4 }} />
