@@ -23,24 +23,28 @@ export const fmt = {
   pct: (v) => (v == null ? '—' : PCT.format(v)),
   ratio: (v) => (v == null ? '—' : F4.format(v)),
   int: (v) => (v == null ? '—' : F0.format(v)),
+  // Formato manual DD/MM/YYYY HH:MM — evita que el locale del browser
+  // o el OS reordene a MM/DD (que es lo que pasaba en Chrome bajo
+  // Windows en español-AR cuando había datos sin TZ explícita).
   ts: (v) => {
     if (!v) return '—'
     const d = new Date(v)
-    return d.toLocaleString('es-AR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`
   },
+  // DD/MM corto para ejes de chart (sin año, sin hora).
   date: (v) => {
     if (!v) return '—'
     const d = new Date(v)
-    return d.toLocaleDateString('es-AR', {
-      month: '2-digit',
-      day: '2-digit',
-    })
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}/${mm}`
   },
 }
 
