@@ -45,7 +45,7 @@ export default function ConsensusRail({ signals, consensus, loading, onSegmentCl
             sin estrategias activas — abrí ⚙ para habilitar
           </div>
         )}
-        {strats.map(({ n, name, short, refKey, refLbl }) => {
+        {strats.map(({ n, name, short, refKey, refLbl, params }) => {
           const sig = loading ? null : getSig(n)
           const s = getStrat(n)
           const refVal = s?.[refKey]
@@ -60,7 +60,10 @@ export default function ConsensusRail({ signals, consensus, loading, onSegmentCl
               title={`Strategy ${n} — ${name}`}
             >
               <span className={styles.rowNum}>S{n}</span>
-              <span className={styles.rowName}>{short}</span>
+              <span className={styles.rowNameBlock}>
+                <span className={styles.rowName}>{short}</span>
+                {params && <span className={styles.rowParams}>{params}</span>}
+              </span>
               <span className={styles.rowGlyph} style={{ color: signalColor(sig) }}>
                 {signalGlyph(sig)}
               </span>

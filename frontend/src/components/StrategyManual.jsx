@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styles from './StrategyManual.module.css'
 
 /*
@@ -223,11 +223,64 @@ const SECTIONS = [
 ]
 
 export default function StrategyManual({ open, onClose }) {
-  const [activeId, setActiveId] = useState(SECTIONS[0].items[0].id)
+  const allItems = SECTIONS.flatMap((g) => g.items)
+  const [activeId, setActiveId] = useState(allItems[0].id)
+  const contentRef = useRef(null)
+  const tocRef = useRef(null)
+  // Mientras dura el scroll programático del click en TOC, congelamos al spy
+  const lockUntilRef = useRef(0)
+
+  // Scroll-spy: detecta qué sección está más cerca del top del content area
+  useEffect(() => {
+    if (!open) return
+    const root = contentRef.current
+    if (!root) return
+
+    const ids = allItems.map((it) => it.id)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (Date.now() < lockUntilRef.current) return
+        // Tomamos las entries visibles y elegimos la de mayor ratio;
+        // si ninguna es "intersecting", caemos a la más cercana al top.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        if (visible[0]) {
+          const id = visible[0].target.id.replace(/^manual-/, '')
+          setActiveId((cur) => (cur === id ? cur : id))
+        }
+      },
+      {
+        root,
+        // Trigger zone: la franja superior 40% del content area
+        rootMargin: '0px 0px -60% 0px',
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      },
+    )
+
+    ids.forEach((id) => {
+      const el = document.getElementById(`manual-${id}`)
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cuando cambia activeId, llevamos el item del TOC a la vista (sticky-follow)
+  useEffect(() => {
+    if (!open || !tocRef.current) return
+    const btn = tocRef.current.querySelector(`[data-toc-id="${activeId}"]`)
+    if (btn) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [activeId, open])
+
   if (!open) return null
 
   const handleNav = (id) => {
     setActiveId(id)
+    // Bloquear el spy ~700ms para que el smooth-scroll no nos pise el activeId
+    lockUntilRef.current = Date.now() + 700
     const el = document.getElementById(`manual-${id}`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -250,13 +303,14 @@ export default function StrategyManual({ open, onClose }) {
         </header>
 
         <div className={styles.body}>
-          <aside className={styles.toc} aria-label="Índice">
+          <aside className={styles.toc} aria-label="Índice" ref={tocRef}>
             {SECTIONS.map((g) => (
               <div key={g.group} className={styles.tocGroup}>
                 <div className={styles.tocGroupTitle}>{g.group}</div>
                 {g.items.map((it) => (
                   <button
                     key={it.id}
+                    data-toc-id={it.id}
                     className={`${styles.tocItem} ${
                       it.id === activeId ? styles.tocItemActive : ''
                     }`}
@@ -269,8 +323,8 @@ export default function StrategyManual({ open, onClose }) {
             ))}
           </aside>
 
-          <article className={styles.content}>
-            {SECTIONS.flatMap((g) => g.items).map((it) => (
+          <article className={styles.content} ref={contentRef}>
+            {allItems.map((it) => (
               <section
                 key={it.id}
                 id={`manual-${it.id}`}
