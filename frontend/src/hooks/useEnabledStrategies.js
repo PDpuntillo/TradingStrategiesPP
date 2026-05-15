@@ -9,12 +9,13 @@ import { useEffect, useState } from 'react'
  */
 
 export const STRATEGY_REGISTRY = [
-  { n: 11, name: 'Single MA',   short: 'SMA', refKey: 'ma_value',     refLbl: 'MA',       params: 'SMA · 20' },
-  { n: 12, name: 'Dual MA',     short: 'DMA', refKey: 'ma_long',      refLbl: 'MA-LONG',  params: '10/30 · SL 2%' },
-  { n: 13, name: 'Triple MA',   short: 'TMA', refKey: 'ma3',          refLbl: 'MA-SLOW',  params: '3/10/21' },
-  { n: 14, name: 'Pivot Point', short: 'PVT', refKey: 'pivot',        refLbl: 'PIVOT',    params: 'H/L/C prev' },
-  { n: 15, name: 'Donchian',    short: 'CHN', refKey: 'band_upper',   refLbl: 'BAND-UP',  params: 'N=20' },
-  // Futuro: agregar más entries aquí (16, 17, 19+) cuando se implementen
+  { n: 11, name: 'Single MA',   short: 'SMA', refKey: 'ma_value',     refLbl: 'MA' },
+  { n: 12, name: 'Dual MA',     short: 'DMA', refKey: 'ma_long',      refLbl: 'MA-LONG' },
+  { n: 13, name: 'Triple MA',   short: 'TMA', refKey: 'ma3',          refLbl: 'MA-SLOW' },
+  { n: 14, name: 'Pivot Point', short: 'PVT', refKey: 'pivot',        refLbl: 'PIVOT' },
+  { n: 15, name: 'Donchian',    short: 'CHN', refKey: 'band_upper',   refLbl: 'BAND-UP' },
+  // Futuro: agregar más entries aquí (16, 17, 19+) cuando se implementen.
+  // Los params se renderean desde useStrategyParams (persisted live).
 ]
 
 const STORAGE_KEY = 'tradingstrategys.enabled-strategies'

@@ -43,7 +43,13 @@ export const api = {
     request(`/cross/${name}`, { method: 'POST', body: JSON.stringify(params) }),
 
   // ===== Signals + consensus =====
-  getSignals: (ticker) => request(`/signals/${ticker}`),
+  // POST con bundle opcional: { strategy_11: {...}, strategy_12: {...}, ... }
+  // Cada campo faltante usa los defaults de Pydantic en el backend.
+  getSignals: (ticker, paramsBundle = null) =>
+    request(`/signals/${ticker}`, {
+      method: 'POST',
+      body: JSON.stringify(paramsBundle ?? {}),
+    }),
 
   // ===== Cache =====
   clearCache: () => request('/cache/clear', { method: 'POST' }),
