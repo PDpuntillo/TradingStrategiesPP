@@ -64,7 +64,7 @@ export default function Header({
           />
           <circle cx="27" cy="8" r="2" fill="var(--accent-blue)" />
         </svg>
-        <span className={styles.brandName}>TRADINGSTRATEGYS</span>
+        <span className={styles.brandName}>TRADING STRATEGIES</span>
         <span className={styles.brandSlash}>//</span>
         <span className={styles.brandSub}>PABLO · MERVAL</span>
       </div>

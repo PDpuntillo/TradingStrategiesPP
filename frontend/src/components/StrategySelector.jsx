@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStrategy } from '../hooks/useStrategy'
+import { useStrategyParams } from '../hooks/useStrategyParams'
 import { fmt, signalColor } from '../lib/format'
 import styles from './StrategySelector.module.css'
 
@@ -31,6 +32,14 @@ const PARAM_DEFS = {
   ],
 }
 
+function isValidParamValue(value, def) {
+  if (def.type === 'select') return def.options.includes(value)
+  if (typeof value !== 'number' || Number.isNaN(value)) return false
+  if (def.min != null && value < def.min) return false
+  if (def.max != null && value > def.max) return false
+  return true
+}
+
 const STRAT_NAMES = {
   11: 'Single Moving Average',
   12: 'Two MAs + Stop-Loss',
@@ -42,14 +51,29 @@ const STRAT_NAMES = {
 export default function StrategySelector({ open, strategyNum, ticker, onClose }) {
   const { data, loading, error, run } = useStrategy(strategyNum)
   const defs = PARAM_DEFS[strategyNum] ?? []
-  const [params, setParams] = useState({})
+  // Params persistidos por (ticker × strategy) — la rail lee de la misma store
+  const [persistedParams, setPersistedParams, resetPersistedParams] = useStrategyParams(ticker, strategyNum)
+  const [params, setParams] = useState({ ticker, ...persistedParams })
 
-  // Reset params al cambiar strategy
+  // Re-sincronizar el form con la store si cambia ticker, strategy, o
+  // si la store cambió externamente (ej. reset desde otro lado)
   useEffect(() => {
-    const init = { ticker }
-    defs.forEach((d) => { init[d.key] = d.def })
-    setParams(init)
-  }, [strategyNum, ticker]) // eslint-disable-line react-hooks/exhaustive-deps
+    setParams({ ticker, ...persistedParams })
+  }, [strategyNum, ticker, persistedParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateParam = (key, value) => {
+    const next = { ...params, [key]: value }
+    setParams(next)
+    // Solo persistir si el valor es válido — así el rail no refetchea con
+    // basura mientras el usuario está tipeando (ej. 233 con max=200). Si el
+    // valor es inválido, el form lo muestra (para que pueda terminar de
+    // tipear) pero la store conserva el último válido.
+    const def = defs.find((d) => d.key === key)
+    if (!def || isValidParamValue(value, def)) {
+      const { ticker: _t, ...paramsOnly } = next
+      setPersistedParams(paramsOnly)
+    }
+  }
 
   const handleRun = (e) => {
     e.preventDefault()
@@ -82,16 +106,24 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
             <div className={styles.noParams}>Esta estrategia no acepta parámetros.</div>
           )}
 
-          {defs.map((d) => (
+          {defs.map((d) => {
+            const currentVal = params[d.key] ?? d.def
+            const valid = isValidParamValue(currentVal, d)
+            return (
             <div key={d.key} className={styles.field}>
               <label htmlFor={d.key} className={styles.label}>
                 {d.label} <span className={styles.bounds}>[{d.min}—{d.max}]</span>
+                {!valid && (
+                  <span className={styles.invalid}>
+                    fuera de rango — no se guardó
+                  </span>
+                )}
               </label>
               {d.type === 'select' ? (
                 <select
                   id={d.key}
-                  value={params[d.key] ?? d.def}
-                  onChange={(e) => setParams({ ...params, [d.key]: e.target.value })}
+                  value={currentVal}
+                  onChange={(e) => updateParam(d.key, e.target.value)}
                 >
                   {d.options.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
@@ -102,19 +134,38 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
                   min={d.min}
                   max={d.max}
                   step={d.step ?? (d.type === 'float' ? 0.01 : 1)}
-                  value={params[d.key] ?? d.def}
-                  onChange={(e) => setParams({
-                    ...params,
-                    [d.key]: d.type === 'int' ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
-                  })}
+                  className={!valid ? styles.inputInvalid : ''}
+                  value={currentVal}
+                  onChange={(e) => updateParam(
+                    d.key,
+                    d.type === 'int' ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
+                  )}
                 />
               )}
             </div>
-          ))}
+            )
+          })}
 
-          <button type="submit" className={styles.submit} disabled={loading}>
-            {loading ? 'EJECUTANDO…' : 'EJECUTAR'}
-          </button>
+          {defs.length > 0 && (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.reset}
+                onClick={resetPersistedParams}
+                title="Volver a los defaults del paper"
+              >
+                RESET
+              </button>
+              <button type="submit" className={styles.submit} disabled={loading}>
+                {loading ? 'EJECUTANDO…' : 'EJECUTAR'}
+              </button>
+            </div>
+          )}
+          {defs.length === 0 && (
+            <button type="submit" className={styles.submit} disabled={loading}>
+              {loading ? 'EJECUTANDO…' : 'EJECUTAR'}
+            </button>
+          )}
         </form>
 
         {error && (

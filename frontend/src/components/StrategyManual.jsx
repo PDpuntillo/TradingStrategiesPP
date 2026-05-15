@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styles from './StrategyManual.module.css'
 
 /*
@@ -223,15 +223,115 @@ const SECTIONS = [
 ]
 
 export default function StrategyManual({ open, onClose }) {
-  const [activeId, setActiveId] = useState(SECTIONS[0].items[0].id)
+  const allItems = SECTIONS.flatMap((g) => g.items)
+  const [activeId, setActiveId] = useState(allItems[0].id)
+  const [indicator, setIndicator] = useState({ top: 0, height: 0, visible: false })
+  const contentRef = useRef(null)
+  const tocRef = useRef(null)
+
+  // Indicador continuo: interpola entre las posiciones de los items del TOC
+  // según el scroll del content area. Hookeado a rAF para que se mueva
+  // perfectamente sincronizado con la rueda del mouse.
+  useEffect(() => {
+    if (!open) return
+    const root = contentRef.current
+    const toc = tocRef.current
+    if (!root || !toc) return
+
+    let rafId = null
+
+    const tick = () => {
+      rafId = null
+      const cursor = root.scrollTop + 40 // pequeño offset para que active antes del top
+
+      // Posiciones absolutas de cada sección dentro del content
+      const items = allItems
+        .map((it) => {
+          const el = document.getElementById(`manual-${it.id}`)
+          return el ? { id: it.id, top: el.offsetTop } : null
+        })
+        .filter(Boolean)
+      if (items.length === 0) return
+
+      // Encontrar la sección actual (la última cuyo top <= cursor)
+      let i = items.length - 1
+      for (let j = 0; j < items.length; j++) {
+        if (items[j].top > cursor) {
+          i = Math.max(0, j - 1)
+          break
+        }
+      }
+      const cur = items[i]
+      const next = items[i + 1]
+      // El último item puede tener su `top` más allá del scrollTop máximo
+      // alcanzable (si su contenido es corto). Clampeamos el "target" al
+      // cursor máximo para que frac llegue a 1 cuando estamos en el fondo.
+      const maxCursor = root.scrollHeight - root.clientHeight + 40
+      const frac = next
+        ? Math.max(
+            0,
+            Math.min(
+              1,
+              (cursor - cur.top) /
+                Math.max(1, Math.min(next.top, maxCursor) - cur.top),
+            ),
+          )
+        : 0
+
+      // activeId snapea al item más "cubierto" (>= 50% del tramo)
+      const dominant = next && frac > 0.5 ? next.id : cur.id
+      setActiveId((prev) => (prev === dominant ? prev : dominant))
+
+      // Interpolar la posición del indicador entre los botones del TOC
+      const curBtn = toc.querySelector(`[data-toc-id="${cur.id}"]`)
+      if (!curBtn) return
+      const nextBtn = next ? toc.querySelector(`[data-toc-id="${next.id}"]`) : null
+      const curTop = curBtn.offsetTop
+      const curHeight = curBtn.offsetHeight
+
+      if (nextBtn) {
+        const nTop = nextBtn.offsetTop
+        const nHeight = nextBtn.offsetHeight
+        const top = curTop + (nTop - curTop) * frac
+        const height = curHeight + (nHeight - curHeight) * frac
+        setIndicator({ top, height, visible: true })
+      } else {
+        setIndicator({ top: curTop, height: curHeight, visible: true })
+      }
+    }
+
+    const onScroll = () => {
+      if (rafId == null) rafId = requestAnimationFrame(tick)
+    }
+
+    // Inicializar inmediatamente y reaccionar a resize
+    tick()
+    root.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
+    return () => {
+      root.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sticky-follow: cuando activeId cambia, llevamos el item al viewport del TOC
+  useEffect(() => {
+    if (!open || !tocRef.current) return
+    const btn = tocRef.current.querySelector(`[data-toc-id="${activeId}"]`)
+    if (btn) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [activeId, open])
+
   if (!open) return null
 
   const handleNav = (id) => {
-    setActiveId(id)
     const el = document.getElementById(`manual-${id}`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+    // el rAF del scroll listener se encarga de mover el indicador y activeId
   }
 
   return (
@@ -250,13 +350,23 @@ export default function StrategyManual({ open, onClose }) {
         </header>
 
         <div className={styles.body}>
-          <aside className={styles.toc} aria-label="Índice">
+          <aside className={styles.toc} aria-label="Índice" ref={tocRef}>
+            <div
+              className={styles.tocIndicator}
+              aria-hidden
+              style={{
+                transform: `translateY(${indicator.top}px)`,
+                height: `${indicator.height}px`,
+                opacity: indicator.visible ? 1 : 0,
+              }}
+            />
             {SECTIONS.map((g) => (
               <div key={g.group} className={styles.tocGroup}>
                 <div className={styles.tocGroupTitle}>{g.group}</div>
                 {g.items.map((it) => (
                   <button
                     key={it.id}
+                    data-toc-id={it.id}
                     className={`${styles.tocItem} ${
                       it.id === activeId ? styles.tocItemActive : ''
                     }`}
@@ -269,8 +379,8 @@ export default function StrategyManual({ open, onClose }) {
             ))}
           </aside>
 
-          <article className={styles.content}>
-            {SECTIONS.flatMap((g) => g.items).map((it) => (
+          <article className={styles.content} ref={contentRef}>
+            {allItems.map((it) => (
               <section
                 key={it.id}
                 id={`manual-${it.id}`}

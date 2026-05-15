@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { fmt, signalColor, signalGlyph } from '../lib/format'
 import { STRATEGY_REGISTRY, useEnabledStrategies } from '../hooks/useEnabledStrategies'
+import { useStrategyParams, formatStrategyParams } from '../hooks/useStrategyParams'
 import StrategyTogglePanel from './StrategyTogglePanel'
 import styles from './ConsensusRail.module.css'
 
@@ -16,14 +17,11 @@ import styles from './ConsensusRail.module.css'
  * Header con cog (⚙) → abre panel para toggle de estrategias activas.
  * Footer = consensus calculado solo sobre las estrategias habilitadas.
  */
-export default function ConsensusRail({ signals, consensus, loading, onSegmentClick }) {
+export default function ConsensusRail({ ticker, signals, consensus, loading, onSegmentClick }) {
   const { enabled, toggle, enableAll, disableAll, reset } = useEnabledStrategies()
   const [panelOpen, setPanelOpen] = useState(false)
 
   const strats = STRATEGY_REGISTRY.filter((s) => enabled.includes(s.n))
-
-  const getSig = (n) => signals?.[`strategy_${n}`]?.signal ?? null
-  const getStrat = (n) => signals?.[`strategy_${n}`]
 
   return (
     <div className={styles.rail} aria-label="Consensus rail">
@@ -45,39 +43,16 @@ export default function ConsensusRail({ signals, consensus, loading, onSegmentCl
             sin estrategias activas — abrí ⚙ para habilitar
           </div>
         )}
-        {strats.map(({ n, name, short, refKey, refLbl }) => {
-          const sig = loading ? null : getSig(n)
-          const s = getStrat(n)
-          const refVal = s?.[refKey]
-          const price = s?.current_price
-          return (
-            <button
-              key={n}
-              className={styles.row}
-              style={{ '--seg-color': sig ? signalColor(sig) : 'var(--bg-elev-3)' }}
-              onClick={() => onSegmentClick?.(n)}
-              disabled={!s && !loading}
-              title={`Strategy ${n} — ${name}`}
-            >
-              <span className={styles.rowNum}>S{n}</span>
-              <span className={styles.rowName}>{short}</span>
-              <span className={styles.rowGlyph} style={{ color: signalColor(sig) }}>
-                {signalGlyph(sig)}
-              </span>
-              <span className={styles.rowSig} style={{ color: signalColor(sig) }}>
-                {sig ?? '—'}
-              </span>
-              <span className={styles.rowMeta}>
-                <span className={styles.metaLbl}>{refLbl}</span>
-                <span className={`${styles.metaVal} tabular`}>{fmt.price(refVal)}</span>
-              </span>
-              <span className={styles.rowMeta}>
-                <span className={styles.metaLbl}>PX</span>
-                <span className={`${styles.metaVal} tabular`}>{fmt.price(price)}</span>
-              </span>
-            </button>
-          )
-        })}
+        {strats.map((s) => (
+          <RailRow
+            key={s.n}
+            ticker={ticker}
+            registry={s}
+            strategySignal={signals?.[`strategy_${s.n}`]}
+            loading={loading}
+            onClick={() => onSegmentClick?.(s.n)}
+          />
+        ))}
       </div>
 
       <div
@@ -98,5 +73,61 @@ export default function ConsensusRail({ signals, consensus, loading, onSegmentCl
         onReset={reset}
       />
     </div>
+  )
+}
+
+/*
+ * RailRow — una fila de estrategia. Se separa en un componente para
+ * poder usar useStrategyParams(ticker, n) sin violar las reglas de hooks
+ * (no se pueden usar en un .map en el padre).
+ *
+ * El chip gris bajo el nombre se renderiza desde los params LIVE de la
+ * store, no de defaults estáticos, así si el usuario cambia MA Period
+ * en el drawer a 50, acá ves "SMA · 50" inmediatamente.
+ */
+function RailRow({ ticker, registry, strategySignal, loading, onClick }) {
+  const { n, name, short, refKey, refLbl } = registry
+  const [params] = useStrategyParams(ticker, n)
+  const paramsLabel = formatStrategyParams(n, params)
+
+  const sig = loading ? null : strategySignal?.signal ?? null
+  const refVal = strategySignal?.[refKey]
+  const price = strategySignal?.current_price
+
+  // Siempre clickeable — si el backend rechazó los params (ej. fuera de
+  // rango), el usuario tiene que poder abrir el drawer para corregir o
+  // hacer RESET. Solo bloqueamos el primer fetch en frío.
+  const failed = !strategySignal && !loading
+  return (
+    <button
+      className={`${styles.row} ${failed ? styles.rowFailed : ''}`}
+      style={{ '--seg-color': sig ? signalColor(sig) : 'var(--bg-elev-3)' }}
+      onClick={onClick}
+      title={
+        failed
+          ? `Strategy ${n} — ${name} · sin resultado, abrí para revisar params`
+          : `Strategy ${n} — ${name}`
+      }
+    >
+      <span className={styles.rowNum}>S{n}</span>
+      <span className={styles.rowNameBlock}>
+        <span className={styles.rowName}>{short}</span>
+        {paramsLabel && <span className={styles.rowParams}>{paramsLabel}</span>}
+      </span>
+      <span className={styles.rowGlyph} style={{ color: signalColor(sig) }}>
+        {signalGlyph(sig)}
+      </span>
+      <span className={styles.rowSig} style={{ color: signalColor(sig) }}>
+        {sig ?? '—'}
+      </span>
+      <span className={styles.rowMeta}>
+        <span className={styles.metaLbl}>{refLbl}</span>
+        <span className={`${styles.metaVal} tabular`}>{fmt.price(refVal)}</span>
+      </span>
+      <span className={styles.rowMeta}>
+        <span className={styles.metaLbl}>PX</span>
+        <span className={`${styles.metaVal} tabular`}>{fmt.price(price)}</span>
+      </span>
+    </button>
   )
 }

@@ -62,6 +62,7 @@ export default function TickerLane({ ticker, tickerName }) {
 
       <div className={styles.body}>
         <ConsensusRail
+          ticker={ticker}
           signals={signals}
           consensus={signals?.consensus_signal}
           loading={sigLoading}

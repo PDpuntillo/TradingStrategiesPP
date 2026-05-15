@@ -92,6 +92,7 @@
 
 /* TOC sidebar */
 .toc {
+  position: relative;
   background: var(--bg-card-soft);
   border-right: 1px solid var(--border-soft);
   background-image: var(--grad-pinstripe);
@@ -102,50 +103,66 @@
   gap: var(--s-3);
 }
 
+/* Indicador continuo: pill azul que se desliza linkeada al scroll */
+.tocIndicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: var(--grad-aqua-blue);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  z-index: 0;
+  /* Sin transition: el rAF en JS calcula la posición frame por frame
+     siguiendo el scroll, así queda perfectamente sincronizado. */
+  will-change: transform, height;
+}
+
 .tocGroup {
   display: flex;
   flex-direction: column;
 }
 
 .tocGroupTitle {
-  padding: var(--s-1) var(--s-4);
+  position: relative;
+  z-index: 2;
+  margin: 0 var(--s-3) var(--s-1);
+  padding: var(--s-1) var(--s-3);
   font-size: var(--fs-micro);
-  color: var(--fg-tertiary);
+  color: var(--fg-secondary);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   font-weight: var(--weight-bold);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
-  margin-bottom: var(--s-1);
+  background: var(--grad-card);
+  border-radius: var(--r-sm);
+  box-shadow:
+    inset 0 0 0 1px var(--border-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .tocItem {
+  position: relative;
+  z-index: 1;
   text-align: left;
   padding: var(--s-2) var(--s-4);
   font-size: var(--fs-xs);
   color: var(--fg-secondary);
   letter-spacing: 0;
-  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  background: transparent;
+  transition: color var(--t-fast) var(--ease);
 }
 
-.tocItem:hover {
-  background: rgba(59, 125, 216, 0.08);
+.tocItem:hover:not(.tocItemActive) {
   color: var(--fg-primary);
 }
 
 .tocItemActive {
-  background: var(--grad-aqua-blue);
   color: white;
   font-weight: var(--weight-semibold);
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-}
-
-.tocItemActive:hover {
-  background: var(--grad-aqua-blue);
-  color: white;
-  filter: brightness(1.04);
 }
 
 /* Content area */
@@ -161,8 +178,8 @@
   scroll-margin-top: var(--s-3);
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
-  padding-bottom: var(--s-5);
+  gap: var(--s-4);
+  padding-bottom: var(--s-6);
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -175,16 +192,17 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-3);
-  padding-bottom: var(--s-2);
-  border-bottom: 1px dashed var(--border-soft);
+  padding-bottom: var(--s-3);
+  border-bottom: 2px solid var(--accent-blue);
 }
 
 .entryTitle {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
   color: var(--fg-primary);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   margin: 0;
+  line-height: 1.15;
 }
 
 .entryRef {
@@ -192,22 +210,33 @@
   color: var(--accent-blue);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   white-space: nowrap;
+  padding: 2px var(--s-2);
+  background: rgba(59, 125, 216, 0.10);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px rgba(59, 125, 216, 0.25);
 }
 
 .block {
   display: flex;
   flex-direction: column;
-  gap: var(--s-1);
+  gap: var(--s-2);
 }
 
 .blockLbl {
-  font-size: var(--fs-micro);
-  color: var(--fg-tertiary);
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px var(--s-2);
+  font-size: 10px;
+  color: var(--fg-secondary);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   font-weight: var(--weight-bold);
+  background: var(--bg-card-soft);
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .prose {

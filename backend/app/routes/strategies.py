@@ -433,21 +433,51 @@ def run_mean_reversion(
 # ============================================
 # AGGREGATE: Todas las señales
 # ============================================
-@router.get("/signals/{ticker}", response_model=AllSignals)
+class SignalsParams(BaseModel):
+    """
+    Bundle de params opcional por estrategia para /signals.
+    Cada campo es un dict de overrides; los faltantes usan los defaults
+    de los Strategy<N>Input correspondientes.
+    """
+    strategy_11: dict | None = None
+    strategy_12: dict | None = None
+    strategy_13: dict | None = None
+    strategy_14: dict | None = None
+    strategy_15: dict | None = None
+
+
+def _build_input(model_cls, ticker: str, overrides: dict | None):
+    """Construye un Strategy<N>Input mezclando ticker + overrides del cliente."""
+    if not overrides:
+        return model_cls(ticker=ticker)
+    # Filtramos claves vacías / None del cliente para no sobrescribir defaults
+    clean = {k: v for k, v in overrides.items() if v is not None and v != ""}
+    return model_cls(ticker=ticker, **clean)
+
+
+@router.post("/signals/{ticker}", response_model=AllSignals)
 def get_all_signals(
     ticker: str,
+    params: SignalsParams | None = None,
     sheets: SheetsService = Depends(get_sheets_service),
 ):
-    """Calcula las 5 estrategias de signal y devuelve consensus."""
+    """
+    Calcula las 5 estrategias de signal y devuelve consensus.
+
+    POST con body opcional de shape:
+      { "strategy_11": {"ma_period": 50}, "strategy_12": {...}, ... }
+    Si no se pasa body o un campo está vacío, se usan los defaults del paper.
+    """
     t = _validate_ticker(ticker)
     data = sheets.get_raw_data(t)
 
+    p = params or SignalsParams()
     results = {}
     signals = []
 
     # Strategy 11
     try:
-        out11 = strategy_11(data.bars, Strategy11Input(ticker=t))
+        out11 = strategy_11(data.bars, _build_input(Strategy11Input, t, p.strategy_11))
         results["strategy_11"] = out11
         signals.append(out11.signal)
     except Exception:
@@ -455,7 +485,7 @@ def get_all_signals(
 
     # Strategy 12
     try:
-        out12 = strategy_12(data.bars, Strategy12Input(ticker=t))
+        out12 = strategy_12(data.bars, _build_input(Strategy12Input, t, p.strategy_12))
         results["strategy_12"] = out12
         signals.append(out12.signal)
     except Exception:
@@ -463,7 +493,7 @@ def get_all_signals(
 
     # Strategy 13
     try:
-        out13 = strategy_13(data.bars, Strategy13Input(ticker=t))
+        out13 = strategy_13(data.bars, _build_input(Strategy13Input, t, p.strategy_13))
         results["strategy_13"] = out13
         signals.append(out13.signal)
     except Exception:
@@ -471,7 +501,7 @@ def get_all_signals(
 
     # Strategy 14
     try:
-        out14 = strategy_14(data.bars, Strategy14Input(ticker=t))
+        out14 = strategy_14(data.bars, _build_input(Strategy14Input, t, p.strategy_14))
         results["strategy_14"] = out14
         signals.append(out14.signal)
     except Exception:
@@ -479,7 +509,7 @@ def get_all_signals(
 
     # Strategy 15
     try:
-        out15 = strategy_15(data.bars, Strategy15Input(ticker=t))
+        out15 = strategy_15(data.bars, _build_input(Strategy15Input, t, p.strategy_15))
         results["strategy_15"] = out15
         signals.append(out15.signal)
     except Exception:

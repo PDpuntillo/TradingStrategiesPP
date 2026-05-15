@@ -14,7 +14,8 @@ export const STRATEGY_REGISTRY = [
   { n: 13, name: 'Triple MA',   short: 'TMA', refKey: 'ma3',          refLbl: 'MA-SLOW' },
   { n: 14, name: 'Pivot Point', short: 'PVT', refKey: 'pivot',        refLbl: 'PIVOT' },
   { n: 15, name: 'Donchian',    short: 'CHN', refKey: 'band_upper',   refLbl: 'BAND-UP' },
-  // Futuro: agregar más entries aquí (16, 17, 19+) cuando se implementen
+  // Futuro: agregar más entries aquí (16, 17, 19+) cuando se implementen.
+  // Los params se renderean desde useStrategyParams (persisted live).
 ]
 
 const STORAGE_KEY = 'tradingstrategys.enabled-strategies'
