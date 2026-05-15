@@ -3,6 +3,7 @@ import { fmt } from '../lib/format'
 import { api } from '../lib/api'
 import AddTickerModal from './AddTickerModal'
 import LaneConfigPanel from './LaneConfigPanel'
+import StrategyManual from './StrategyManual'
 import styles from './Header.module.css'
 
 /*
@@ -25,6 +26,7 @@ export default function Header({
   const [clearing, setClearing] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [laneConfigOpen, setLaneConfigOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -86,6 +88,34 @@ export default function Header({
             ⚙ {laneConfig.config.visible.length}/{laneConfig.config.order.length}
           </button>
         )}
+        <button
+          type="button"
+          className={styles.manualBtn}
+          onClick={() => setManualOpen(true)}
+          title="Manual de estrategias"
+          aria-label="Manual de estrategias"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+            <path
+              d="M2.5 2.5h4.2c.8 0 1.3.3 1.3 1v9.5c0-.5-.5-1-1.3-1H2.5V2.5z"
+              fill="currentColor"
+              opacity="0.55"
+            />
+            <path
+              d="M13.5 2.5H9.3c-.8 0-1.3.3-1.3 1v9.5c0-.5.5-1 1.3-1h4.2V2.5z"
+              fill="currentColor"
+              opacity="0.85"
+            />
+            <path
+              d="M2.5 2.5h4.2c.8 0 1.3.3 1.3 1v9.5c0-.5-.5-1-1.3-1H2.5V2.5z M13.5 2.5H9.3c-.8 0-1.3.3-1.3 1v9.5c0-.5.5-1 1.3-1h4.2V2.5z"
+              stroke="currentColor"
+              strokeWidth="0.7"
+              fill="none"
+              opacity="0.9"
+            />
+          </svg>
+          MANUAL
+        </button>
       </div>
 
       {/* Scrollable ticker shortcuts — separados de actions */}
@@ -121,6 +151,8 @@ export default function Header({
         onClose={() => setAddOpen(false)}
         onSuccess={() => onTickerAdded?.()}
       />
+
+      <StrategyManual open={manualOpen} onClose={() => setManualOpen(false)} />
 
       {laneConfig && (
         <LaneConfigPanel

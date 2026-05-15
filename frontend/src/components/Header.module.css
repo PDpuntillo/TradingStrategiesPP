@@ -53,7 +53,8 @@
 }
 
 .addBtn,
-.cogBtn {
+.cogBtn,
+.manualBtn {
   padding: var(--s-1) var(--s-3);
   background: var(--grad-toolbar-active);
   color: var(--fg-secondary);
@@ -67,13 +68,26 @@
   transition: filter var(--t-fast) var(--ease);
 }
 
+.manualBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.manualBtn svg {
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
 .addBtn:hover,
-.cogBtn:hover {
+.cogBtn:hover,
+.manualBtn:hover {
   filter: brightness(1.04);
 }
 
 .addBtn:active,
-.cogBtn:active {
+.cogBtn:active,
+.manualBtn:active {
   box-shadow: var(--shadow-aqua-btn-active);
   filter: brightness(0.95);
 }
