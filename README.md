@@ -1,4 +1,4 @@
-# Tradingstrategys
+# TradingStrategiesPP
 
 Dashboard cuantitativo en tiempo real para el panel líder del Merval. Implementa 6 estrategias del paper **"151 Trading Strategies"** de Kakushadze & Serur (2018) con datos OHLCV de Google Sheets, backend FastAPI y frontend React/Vite con estética de terminal Bloomberg.
 
