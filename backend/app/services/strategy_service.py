@@ -318,22 +318,64 @@ def _compute_returns(bars: List[PriceBar]) -> np.ndarray:
     return np.log(prices[1:] / prices[:-1])
 
 
+def _solve_long_only_sharpe(expected_returns: np.ndarray, cov_matrix: np.ndarray) -> np.ndarray:
+    """
+    Maximiza Sharpe ratio con restricciones w_i ≥ 0 y Σ w_i = 1 (long-only real).
+
+    No hay solución analítica con la restricción de no-negatividad — usamos
+    SLSQP numérico. El mercado argentino no permite shortselling, así que
+    este modo es el realista para portfolios de Merval. Para mercados con
+    shortselling disponible (USA), usar dollar_neutral=True.
+
+    Fallback: si SLSQP no converge, devuelve equal-weight.
+    """
+    n = len(expected_returns)
+
+    def neg_sharpe(w):
+        ret = float(w @ expected_returns)
+        vol = float(np.sqrt(w @ cov_matrix @ w))
+        if vol < 1e-12:
+            return 1e6  # penalty si vol degenera a 0
+        return -ret / vol
+
+    # Σ w_i = 1
+    constraints = ({"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},)
+    # w_i ∈ [0, 1]
+    bounds = [(0.0, 1.0)] * n
+    # Punto inicial: equal-weight
+    w0 = np.ones(n) / n
+
+    result = optimize.minimize(
+        neg_sharpe,
+        w0,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options={"maxiter": 300, "ftol": 1e-9},
+    )
+
+    if not result.success:
+        return w0
+    # Clip por seguridad numérica (SLSQP puede dejar pesos ligeramente
+    # negativos por tolerancia) y re-normalizar
+    w = np.clip(result.x, 0.0, None)
+    s = np.sum(w)
+    return w / s if s > 1e-12 else w0
+
+
 def strategy_18(
     bars_by_ticker: dict[Ticker, List[PriceBar]],
     params: Strategy18Input,
 ) -> Strategy18Output:
     """
-    Strategy 18 - Portfolio Optimization (eqs. 342-358):
+    Strategy 18 - Portfolio Optimization (eqs. 342-358 del paper).
 
-    Maximiza Sharpe ratio o minimiza el quadratic objective:
-        g(w, λ) = (λ/2) Σ C_ij w_i w_j - Σ E_i w_i
-
-    Sujeto a: Σ |w_i| = 1
-              Σ w_i = 0  (si dollar_neutral=True)
-
-    Solución analítica:
-        w_i = (1/λ) [Σ C^(-1)_ij E_j  -  μ × Σ C^(-1)_ij]  (si dollar_neutral)
-        w_i = (1/λ) Σ C^(-1)_ij E_j                        (si no)
+    Dos modos:
+      dollar_neutral=True  → Solución analítica de Markowitz con Σ w_i = 0
+                             (permite shortselling). Eq. 358 del paper.
+      dollar_neutral=False → Long-only real: w_i ≥ 0, Σ w_i = 1, vía SLSQP.
+                             El mercado argentino no permite shortselling
+                             así que este es el modo realista para Merval.
     """
     tickers = params.tickers
     n = len(tickers)
@@ -362,34 +404,28 @@ def strategy_18(
     expected_returns = np.array(expected_returns)
     volatilities = np.array(volatilities)
 
-    # 2. Matriz de covarianza
+    # 2. Matriz de covarianza (regularizada para estabilidad numérica)
     cov_matrix = np.cov(returns_aligned, ddof=1)  # shape (n, n)
-
-    # 3. Optimización
-    # Regularización por estabilidad numérica
     cov_matrix_reg = cov_matrix + np.eye(n) * 1e-8
-    cov_inv = np.linalg.inv(cov_matrix_reg)
 
+    # 3. Optimización según modo
     if params.dollar_neutral:
-        # Eq. 358: w_i = (1/λ) [C^(-1) E - μ × C^(-1) × 1] (dollar-neutral)
+        # Eq. 358 (paper): solución analítica con Σ w_i = 0 (allows shorts)
+        cov_inv = np.linalg.inv(cov_matrix_reg)
         ones = np.ones(n)
         cov_inv_E = cov_inv @ expected_returns
         cov_inv_ones = cov_inv @ ones
-
-        # μ = (1' C^(-1) E) / (1' C^(-1) 1)
         mu = (ones @ cov_inv_E) / (ones @ cov_inv_ones)
         raw_weights = cov_inv_E - mu * cov_inv_ones
+        # Normalización: Σ |w_i| = 1
+        abs_sum = np.sum(np.abs(raw_weights))
+        if abs_sum < 1e-10:
+            weights = np.ones(n) / n
+        else:
+            weights = raw_weights / abs_sum
     else:
-        # Eq. 353: w_i = (1/λ) C^(-1) E  (long-only, sin constraint dollar-neutral)
-        raw_weights = cov_inv @ expected_returns
-
-    # Normalización: Σ |w_i| = 1
-    abs_sum = np.sum(np.abs(raw_weights))
-    if abs_sum < 1e-10:
-        # Fallback a pesos iguales
-        weights = np.ones(n) / n
-    else:
-        weights = raw_weights / abs_sum
+        # Long-only real: w_i ≥ 0, Σ w_i = 1, resuelto por SLSQP
+        weights = _solve_long_only_sharpe(expected_returns, cov_matrix_reg)
 
     # 4. Métricas del portfolio
     portfolio_return = float(weights @ expected_returns)

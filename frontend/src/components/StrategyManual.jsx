@@ -228,7 +228,7 @@ const SECTIONS = [
         label: 'Sharpe-Max Optimizer',
         paperRef: 'Estrategia #18',
         what:
-          'Dado un universo de tickers, encuentra los pesos que maximizan el ratio de Sharpe del portfolio (retorno esperado por unidad de riesgo). Usa la matriz de covarianza de los retornos diarios y la solución analítica de Markowitz. Opcionalmente con shortselling (dollar-neutral, Σw_i = 0) o long-only (w_i ≥ 0).',
+          'Dado un universo de tickers, encuentra los pesos que maximizan el ratio de Sharpe del portfolio (retorno esperado por unidad de riesgo). Dos modos: long-only (default, w_i ≥ 0 y Σw_i = 1, resuelto numéricamente por SLSQP — el realista para el Merval donde no se puede shortear) y dollar-neutral (toggle ON, Σw_i = 0 permitiendo shorts, solución analítica de Markowitz — válido solo en mercados como USA con shortselling disponible).',
         formula: [
           'maximize  Sharpe(w) = (wᵀμ − r_f) / √(wᵀΣw)',
           'subject to  Σ w_i = 1',
@@ -239,9 +239,9 @@ const SECTIONS = [
           'r_f = risk-free rate (default 0)',
         ],
         interpret:
-          'Es el punto tangente de la frontera eficiente de Markowitz — teóricamente óptimo. Pero es extremadamente sensible a errores en los retornos esperados (μ): pequeños cambios en las estimaciones pueden hacer flip-flop los pesos del portfolio entre meses. En la práctica institucional se combina con técnicas de shrinkage (Ledoit-Wolf) o restricciones de turnover. Lo usamos como baseline para comparar contra portfolios naïve (equal-weight, market-cap weighted).',
+          'Es el punto tangente de la frontera eficiente de Markowitz — teóricamente óptimo. Pero es extremadamente sensible a errores en los retornos esperados (μ): pequeños cambios en las estimaciones pueden hacer flip-flop los pesos del portfolio entre meses. En la práctica institucional se combina con técnicas de shrinkage (Ledoit-Wolf) o restricciones de turnover. Lo usamos como baseline para comparar contra portfolios naïve (equal-weight, market-cap weighted). Sobre el toggle DOLLAR NEUTRAL: con OFF (default) corre en long-only real — los pesos son siempre ≥ 0 y suman 1, no genera shorts (modo realista para el mercado argentino). Con ON permite shorts y restringe que Σw = 0: la posición long total equivale en dólares a la short total, dando un portfolio market-neutral indiferente al movimiento del índice general — pero requiere shortselling disponible (USA, brokers internacionales).',
         example:
-          'Universo = [YPF, GGAL, PAMP, KO_CEDEAR, AAPL_CEDEAR]. Lookback 60 días: retornos medios anualizados [0.18, 0.22, 0.15, 0.08, 0.30] y covarianza estimada de la matriz de retornos diarios. La optimización long-only devuelve pesos {YPF: 0.10, GGAL: 0.25, PAMP: 0.15, KO: 0.20, AAPL: 0.30}. Sharpe portfolio = 1.45 (vs 0.95 si todos equal-weight). Para un total_investment de $100k → $30k en AAPL, $25k en GGAL, etc.',
+          'Universo = [YPF, GGAL, PAMP, KO_CEDEAR, AAPL_CEDEAR]. Lookback 60 días: retornos medios anualizados [0.18, 0.22, 0.15, 0.08, 0.30] y covarianza estimada de la matriz de retornos diarios. La optimización long-only devuelve pesos {YPF: 0.10, GGAL: 0.25, PAMP: 0.15, KO: 0.20, AAPL: 0.30} — todos positivos, suman 1. Sharpe portfolio = 1.45 (vs 0.95 si todos equal-weight). Para un total_investment de $100k → $30k en AAPL, $25k en GGAL, etc. Si activás DOLLAR NEUTRAL con el mismo universo, podrías ver {YPF: +0.40, AAPL: +0.30, GGAL: +0.10, PAMP: -0.20, KO: -0.60} — pesos que suman 0, esto significa shortear $60k de KO y $20k de PAMP para fondear $80k de longs en YPF + AAPL + GGAL.',
       },
     ],
   },
