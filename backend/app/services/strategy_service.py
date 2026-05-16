@@ -188,13 +188,15 @@ def strategy_13(
     elif ma1 < ma2 < ma3:
         signal = SignalType.SHORT
         trend_aligned = True
-    elif ma1 <= ma2 and ma2 > ma3:  # rompe alineación alcista
+    elif ma1 <= ma2:                 # corta cruza por debajo de la intermedia → exit long
         signal = SignalType.EXIT_LONG
         trend_aligned = False
-    elif ma1 >= ma2 and ma2 < ma3:  # rompe alineación bajista
+    elif ma1 >= ma2:                 # corta cruza por encima de la intermedia → exit short
         signal = SignalType.EXIT_SHORT
         trend_aligned = False
     else:
+        # inalcanzable con las dos condiciones anteriores cubriendo todo el dominio,
+        # se deja por defensa.
         signal = SignalType.HOLD
         trend_aligned = False
 

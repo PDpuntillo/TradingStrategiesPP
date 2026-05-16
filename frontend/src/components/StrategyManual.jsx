@@ -52,14 +52,15 @@ const SECTIONS = [
         label: 'TMA — Triple Moving Average',
         paperRef: 'paper #13',
         what:
-          'Tres medias móviles (corta, media, larga) alineadas. El signal requiere que las tres confirmen la misma dirección — filtro más estricto que DMA.',
+          'Tres medias móviles (corta, media, larga). Entrada cuando las tres están alineadas en la misma dirección; salida cuando la corta cruza a la intermedia (sin importar la larga), señalando que la tendencia se rompe.',
         formula: [
-          'SMA_fast < SMA_mid < SMA_slow   →   SHORT',
           'SMA_fast > SMA_mid > SMA_slow   →   LONG',
-          'cualquier otra disposición       →   NEUTRAL',
+          'SMA_fast < SMA_mid < SMA_slow   →   SHORT',
+          'SMA_fast ≤ SMA_mid              →   EXIT_LONG',
+          'SMA_fast ≥ SMA_mid              →   EXIT_SHORT',
         ],
         interpret:
-          'Más selectivo que DMA — genera menos signals pero con mayor confianza. Bueno para evitar falsos cruces en mercados ruidosos. Ej: 10/20/50.',
+          'Entradas más selectivas que DMA (las 3 medias deben confirmar), pero salidas tempranas en cuanto la corta cruza la intermedia — captura reversales antes que esperando a las 3 desalineadas. Ej: 10/20/50.',
       },
       {
         id: 'pivot',
