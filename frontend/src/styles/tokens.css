@@ -63,12 +63,22 @@
   --grad-neutral: linear-gradient(180deg, #C0C0C5 0%, #9090954 50%, #707075 100%);
 
   /* ===== Chart series colors (legibles sobre light theme + distinguibles entre sí) ===== */
-  /* MAs: tres colores bien separados en el wheel (verde / naranja / violeta).
-     Evitamos azul para que no compita con el accent y con la Donchian band. */
-  --overlay-cyan:   #1F8F4F;   /* MA10 — verde oscuro */
-  --overlay-blue:   #D77900;   /* MA20 — naranja saturado */
-  --overlay-violet: #7A3FB8;   /* MA50 — violeta intenso */
-  /* Donchian bands — azul saturado para contraste con las MAs */
+  /* Legacy MA colors (mantenidos por backward-compat) — ya no usados por el chart */
+  --overlay-cyan:   #1F8F4F;   /* verde oscuro */
+  --overlay-blue:   #D77900;   /* naranja saturado */
+  --overlay-violet: #7A3FB8;   /* violeta intenso */
+
+  /* Overlays por estrategia — 6 colores distintos, sin verde ni rojo (chocan
+     con las velas) ni azul saturado (choca con el accent y el Donchian).
+     Cada línea de S11/S12/S13 tiene un color propio. */
+  --overlay-s11:        #D77900;   /* naranja saturado */
+  --overlay-s12-fast:   #C03A8E;   /* magenta */
+  --overlay-s12-slow:   #1A8F95;   /* teal */
+  --overlay-s13-fast:   #C99800;   /* amber/gold */
+  --overlay-s13-mid:    #7A3FB8;   /* violeta */
+  --overlay-s13-slow:   #3D5366;   /* slate */
+
+  /* Donchian bands — azul saturado dashed para contraste */
   --overlay-donchian: #2459B5;
   /* Pivot/Support/Resistance — gris medio dashed (neutro, no compite con MAs) */
   --overlay-pivot:  #707075;

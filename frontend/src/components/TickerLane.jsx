@@ -68,7 +68,7 @@ export default function TickerLane({ ticker, tickerName }) {
           loading={sigLoading}
           onSegmentClick={openStrategy}
         />
-        <ChartPanel data={bars} signals={signals} loading={barsLoading} />
+        <ChartPanel ticker={ticker} data={bars} signals={signals} loading={barsLoading} />
 
         {/* Drawer contextual a la lane — overlay absoluto, sin backdrop */}
         <StrategySelector
