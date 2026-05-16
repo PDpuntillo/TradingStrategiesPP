@@ -19,9 +19,9 @@ const SECTIONS = [
       {
         id: 'sma',
         label: 'SMA Crossover',
-        paperRef: 'paper #11',
+        paperRef: 'Estrategia #11',
         what:
-          'Estrategia de seguimiento de tendencia clásica: cuando el precio cruza por encima de una media móvil simple de largo plazo, hay momentum alcista — LONG. Cuando cruza por debajo, momentum bajista — SHORT.',
+          'La estrategia más simple de trend-following. Calcula el promedio de los últimos N precios de cierre y lo compara contra el precio actual. La media móvil suaviza el ruido del mercado y revela la dirección dominante de la tendencia: si el precio está por encima de la media, el mercado viene subiendo en promedio sobre esa ventana → momentum alcista. Si está por debajo, es lo contrario.',
         formula: [
           'SMA(N) = (1/N) · Σ Closeₜ₋ᵢ   para i = 0..N-1',
           '',
@@ -30,14 +30,16 @@ const SECTIONS = [
           'signal = NEUTRAL si están dentro del threshold ε',
         ],
         interpret:
-          'Funciona en regímenes con tendencia clara. En mercados laterales genera muchos falsos cruces ("whipsaws"). N grande = menos ruido, más lag.',
+          'Funciona muy bien en mercados con tendencias claras y prolongadas (rallies o bear markets sostenidos). En mercados laterales o "choppy" genera muchos falsos cruces ("whipsaws") donde el precio rebota constantemente alrededor de la media, disparando entradas/salidas que pierden plata por comisiones y slippage. N grande = menos ruido pero más lag; N chico = más sensible pero más falsas señales.',
+        example:
+          'YPF.BA cotiza a $65,300 y la SMA(20) está en $64,036. El precio está 2% por encima de la media → LONG. Si en las próximas ruedas YPF baja a $63,500 con la SMA(20) ahora en $63,800, el signal flipea a SHORT.',
       },
       {
         id: 'dma',
         label: 'DMA — Dual Moving Average',
-        paperRef: 'paper #12',
+        paperRef: 'Estrategia #12',
         what:
-          'Refina el SMA usando dos medias: una corta (rápida) y una larga (lenta). El signal se dispara solo cuando ambas se confirman entre sí.',
+          'Refina la idea del SMA usando DOS medias en vez de comparar contra el precio crudo. Una corta (rápida, captura el ritmo reciente) y una larga (lenta, captura la tendencia de fondo). El signal se dispara cuando la rápida cruza a la lenta — ese cruce significa que el momentum reciente cambió de signo respecto al promedio histórico. Le suma un stop-loss porcentual sobre el cierre anterior para no quedarte atrapado en un movimiento adverso brusco antes de que las medias respondan.',
         formula: [
           'SMA_fast = SMA(N_fast),   SMA_slow = SMA(N_slow)   (N_fast < N_slow)',
           '',
@@ -45,14 +47,16 @@ const SECTIONS = [
           'signal = SHORT  si SMA_fast < SMA_slow',
         ],
         interpret:
-          'El cruce de medias filtra parte del ruido del SMA simple, pero introduce más lag. Comúnmente 20/50 o 50/200 (golden / death cross).',
+          'Las combinaciones más conocidas son 20/50 (entradas tempranas, más sensible) y 50/200 (los famosos "golden cross" / "death cross", entradas tardías pero más confiables). El stop-loss del 2% es agresivo — útil en activos volátiles o en crisis (las medias móviles tienen lag y un crash puede vaciarte la cuenta antes de que la corta cruce a la larga).',
+        example:
+          'GGAL.BA con SMA(10)=$6,250 y SMA(30)=$6,180 → la rápida está por encima → LONG. Si mañana abre en gap-down a $6,050 (caída del 3.2% vs cierre anterior $6,250), se dispara EXIT_LONG por el stop-loss del 2% sin esperar a que las medias se reordenen.',
       },
       {
         id: 'tma',
         label: 'TMA — Triple Moving Average',
-        paperRef: 'paper #13',
+        paperRef: 'Estrategia #13',
         what:
-          'Tres medias móviles (corta, media, larga). Entrada cuando las tres están alineadas en la misma dirección; salida cuando la corta cruza a la intermedia (sin importar la larga), señalando que la tendencia se rompe.',
+          'Generaliza el DMA a tres medias (rápida, media, lenta). Entrada cuando las tres están alineadas en la misma dirección (fast > mid > slow → LONG; fast < mid < slow → SHORT) — exige que la tendencia esté confirmada en tres horizontes temporales distintos, así reduce los falsos positivos del DMA. La salida es más sensible: cuando la rápida cruza a la intermedia (sin importar la larga), ya se sale de la posición — captura reversales temprano antes de esperar a que se desalineen las tres.',
         formula: [
           'SMA_fast > SMA_mid > SMA_slow   →   LONG',
           'SMA_fast < SMA_mid < SMA_slow   →   SHORT',
@@ -60,14 +64,16 @@ const SECTIONS = [
           'SMA_fast ≥ SMA_mid              →   EXIT_SHORT',
         ],
         interpret:
-          'Entradas más selectivas que DMA (las 3 medias deben confirmar), pero salidas tempranas en cuanto la corta cruza la intermedia — captura reversales antes que esperando a las 3 desalineadas. Ej: 10/20/50.',
+          'Filtro estricto para entrar, salida temprana para preservar capital. La asimetría es deliberada: entrar exige confirmación múltiple (3 medias), salir solo necesita una grieta (2 medias). Es de las pocas estrategias del set que cuida más el riesgo que la ganancia. Combinación clásica: 10/20/50.',
+        example:
+          'PAMP.BA con SMA(3)=$1,820, SMA(10)=$1,805, SMA(21)=$1,780. Las tres alineadas (3 > 10 > 21) → LONG. Si SMA(3) baja a $1,795 (por debajo de SMA(10)=$1,805) → EXIT_LONG inmediato, incluso aunque SMA(21) siga subiendo. Saliste antes que el DMA tradicional, que esperaría a que también se desalineen las medias largas.',
       },
       {
         id: 'pivot',
         label: 'Pivot Points',
-        paperRef: 'paper #14',
+        paperRef: 'Estrategia #14',
         what:
-          'Niveles de soporte y resistencia derivados del high, low y close del período anterior. Se usan como referencias intradiarias o multi-día.',
+          'Calcula niveles psicológicos de soporte (S) y resistencia (R) usando el high, low y close del día anterior. El "pivote" es el promedio de los tres — funciona como divisor entre zona alcista y bajista del día. R y S son rebotes calculados a partir del rango. Es la estrategia preferida por floor traders intradiarios: te da niveles concretos antes de la apertura.',
         formula: [
           'P  = (High + Low + Close) / 3',
           'R1 = 2P − Low      S1 = 2P − High',
@@ -77,14 +83,16 @@ const SECTIONS = [
           'signal = SHORT  si Close < P',
         ],
         interpret:
-          'Niveles psicológicos donde el mercado tiende a reaccionar. Útil como contexto: si rompe R1 con volumen, breakout; si rebota en S1, mean reversion.',
+          'Útil como mapa de referencia: si el precio rompe R con volumen, breakout alcista probable; si rebota en S, mean-reversion al alza. La estrategia te dice LONG si el precio está sobre el pivote (sesgo intradiario alcista), SHORT si está debajo. EXIT cuando toca los extremos (R o S) — la idea es que esos niveles "atraen" el precio y rara vez se rompen sin pull-back.',
+        example:
+          'ALUA.BA ayer cerró con high=$745, low=$728, close=$740. Pivote = (745+728+740)/3 = $737.67. R = 2(737.67) − 728 = $747.33. S = 2(737.67) − 745 = $730.33. Hoy ALUA abre a $742 → por encima del pivote → LONG. Si llega a $747.50 (supera R) → EXIT_LONG. Si vuelve a $729 (toca S desde arriba) → EXIT_SHORT.',
       },
       {
         id: 'donchian',
         label: 'Donchian Channels',
-        paperRef: 'paper #15',
+        paperRef: 'Estrategia #15',
         what:
-          'Canal formado por el high máximo y el low mínimo de los últimos N períodos. Breakouts del canal indican momentum direccional.',
+          'Construye un canal con el high máximo y el low mínimo de los últimos N períodos. Cuando el precio toca el techo del canal hay rechazo desde resistencia → SHORT; cuando toca el piso, rebote desde soporte → LONG. Es la base del legendario sistema "Turtle Traders" de Richard Dennis. Lógica de mean-reversion sobre los extremos del rango reciente.',
         formula: [
           'Upper(N) = max(Highₜ₋₁..ₜ₋ₙ)',
           'Lower(N) = min(Lowₜ₋₁..ₜ₋ₙ)',
@@ -94,7 +102,9 @@ const SECTIONS = [
           'signal = SHORT  si Close < Lower',
         ],
         interpret:
-          'Sistema turtle clásico. Captura tendencias largas pero tiene drawdowns importantes en mercados sin trend. N típico = 20 (4 semanas) ó 55.',
+          'N corto (10-20 ruedas) = canal angosto, signals frecuentes pero ruidosos. N largo (55+) = canal ancho, signals raros pero contundentes (típicos breakouts/breakdowns mayores). Usamos una tolerancia del 0.5% del ancho del canal para considerar "tocó la banda" — sin eso casi nunca dispararía signal en datos reales. Captura tendencias largas pero con drawdowns importantes en mercados sin trend.',
+        example:
+          'BMA.BA con canal N=20 → band_upper=$7,175, band_lower=$6,820 (ancho = $355, tolerancia = $1.78). Si BMA cotiza a $7,173 → dentro del rango de tolerancia al techo → SHORT (rebote esperado desde resistencia). Si cotiza a $6,822 → cerca del piso → LONG. Si está en $7,000 (centro) → HOLD, ningún extremo tocado.',
       },
     ],
   },
@@ -104,9 +114,9 @@ const SECTIONS = [
       {
         id: 'momentum',
         label: 'Price Momentum',
-        paperRef: 'paper #1',
+        paperRef: 'Estrategia #1',
         what:
-          'Rankea los tickers del universo por su retorno acumulado en el período de formación, dejando un mes de "skip" para evitar el efecto de short-term reversal. Los winners siguen ganando, los losers siguen perdiendo.',
+          'Anomalía cross-sectional descubierta por Jegadeesh & Titman (1993): los winners siguen ganando y los losers siguen perdiendo, al menos por algunos meses. Calcula el retorno acumulado de cada ticker en los últimos T meses dejando S meses de "skip" para evitar el efecto contrario de short-term reversal. Rankea descendente: top decile = LONG (ganadores recientes), bottom decile = SHORT (perdedores).',
         formula: [
           'r_i = (P_{t−skip} / P_{t−skip−lookback}) − 1',
           '',
@@ -114,14 +124,16 @@ const SECTIONS = [
           'bottom decile (menor r_i) →   SHORT',
         ],
         interpret:
-          'Una de las anomalías más robustas (Jegadeesh & Titman 1993). Performa bien en tendencias largas; sufre durante crashes y reversiones bruscas. Lookback típico 12 meses, skip 1 mes.',
+          'Es de las anomalías más robustas de la literatura financiera — funciona en casi todos los mercados y períodos estudiados. Performa bien en regímenes con tendencias claras y prolongadas. Sufre fuerte en "momentum crashes" tras crisis (Marzo 2009, Abril 2020), cuando los losers rebotan más fuerte que los winners. Lookback típico: 12 meses, skip 1 mes.',
+        example:
+          'Universo de 20 CEDEARs, lookback 252 ruedas. NVDA acumuló +85% y META +60% (top decile → LONG). En el mismo período, INTC perdió -25% y BIDU -30% (bottom decile → SHORT). La estrategia compra NVDA+META y shortea INTC+BIDU con pesos iguales. Si la rotación continúa el próximo mes, el portfolio gana sin importar para dónde vaya el mercado.',
       },
       {
         id: 'low_vol',
         label: 'Low Volatility',
-        paperRef: 'paper #4',
+        paperRef: 'Estrategia #4',
         what:
-          'Anomalía: portfolios de baja volatilidad realizada generan retornos similares o superiores a los de alta vol, con menor riesgo. Va contra el CAPM.',
+          'Anomalía que contradice la teoría clásica del CAPM: las acciones de baja volatilidad generan retornos similares o superiores a las de alta vol, ajustados por riesgo. Rankea cada ticker por la desviación estándar de sus retornos diarios sobre la ventana de lookback, ascendente: top decile (menor vol) = LONG, bottom decile (mayor vol) = SHORT.',
         formula: [
           'σ_i = std(retornos diarios de i en los últimos N días) · √252',
           '',
@@ -129,14 +141,16 @@ const SECTIONS = [
           'top decile (mayor σ)    →   SHORT',
         ],
         interpret:
-          'Útil para portfolios defensivos. Tiende a sobreexponerse a sectores estables (utilities, consumer staples). Cuidado con régimen de tasas: low-vol stocks son sensibles a tasas.',
+          'Es la base de los populares ETFs "min-vol" (USMV, SPLV). Funciona porque los inversores institucionales tienen aversión extrema al riesgo y subponderan estructuralmente las acciones más volátiles, dejándolas baratas. Tiende a sobreexponerse a sectores defensivos (utilities, consumer staples, real estate). Cuidado con el régimen de tasas: low-vol stocks suelen ser sensibles a tasas largas.',
+        example:
+          'Universo de 30 acciones del Merval + CEDEARs. KO_CEDEAR tiene vol anualizada del 18%, JPM_CEDEAR del 22% (top decile → LONG). YPFD, GGAL y TSLA_CEDEAR con vols del 55-70% (bottom decile → SHORT). La estrategia construye un portfolio dollar-neutral: long defensivos / short de alta beta. Apuesta a capturar el spread de vol-anomaly durante meses.',
       },
       {
         id: 'value',
         label: 'Value — Book / Price',
-        paperRef: 'paper #3',
+        paperRef: 'Estrategia #3',
         what:
-          'Rankea por el ratio B/P (valor contable por acción sobre precio actual). Cuanto mayor B/P, más "barata" la acción respecto a sus activos.',
+          'Factor clásico de Fama-French. El ratio B/P (valor contable por acción dividido por precio actual) mide qué tan "barata" está la acción respecto a sus activos contables. Rankea descendente: top decile (B/P alto = más barato) = LONG (cheap), bottom decile (B/P bajo = caro) = SHORT (expensive).',
         formula: [
           'B/P_i = BookValuePerShare_i / Price_i',
           '',
@@ -144,14 +158,16 @@ const SECTIONS = [
           'bottom decile (menor B/P) →   SHORT (expensive)',
         ],
         interpret:
-          'Fama–French factor clásico. Requiere data manual: cada ticker debe tener una sheet FUNDAMENTALS con BookValuePerShare cargada a mano. Performa mal en bull markets growth-driven (2017-2021); rebota en rotaciones value.',
+          'Funciona porque los inversores sobre-pagan por acciones "glamour" (alto crecimiento esperado) y subestiman a las "boring" pero rentables. Performa mal durante bull markets growth-driven (2010-2021 fue desastroso para value). Rebota fuerte en rotaciones value vs growth (2022).',
+        example:
+          'GGAL cotiza a $6,185 con BookValuePerShare = $4,800 → B/P = 0.78. BBAR cotiza a $3,200 con BVPS = $4,100 → B/P = 1.28 (más value). En un universo de 10 bancos LATAM, BBAR queda en el top decile → LONG; si NVDA_CEDEAR tiene B/P ≈ 0.05 (precio = 20x el book), está en el bottom → SHORT. La estrategia apuesta a que el spread de valuation se cierre por reversión histórica.',
       },
       {
         id: 'multifactor',
         label: 'Multifactor',
-        paperRef: 'paper #6',
+        paperRef: 'Estrategia #6',
         what:
-          'Combina momentum + low-vol + value en un único score promedio de ranks. Diversifica entre factores y reduce drawdown vs cualquiera individual.',
+          'Combina los tres rankings anteriores (momentum + low-vol + value) en un único score promedio. Para cada ticker, se normalizan los rangos de cada factor a [0,1] (0 = mejor) y se promedian. Luego se rankea ascendente por ese score combinado: top decile = LONG, bottom = SHORT. Es la práctica estándar en quant institucional.',
         formula: [
           'score_i = (rank_mom_i + rank_lowvol_i + rank_value_i) / 3',
           '',
@@ -159,14 +175,16 @@ const SECTIONS = [
           'bottom decile (mayor)    →   SHORT',
         ],
         interpret:
-          'Reduce la variance del PnL porque los factores no están perfectamente correlacionados. Standard en quant institucional. Requiere que B/P esté disponible para todos los tickers.',
+          'Diversifica entre factores que tienen correlaciones bajas entre sí — cuando momentum tiene un mal año, value puede estar bien, y viceversa. Eso suaviza el equity curve del portfolio y reduce el drawdown máximo. Costo: el retorno esperado es el promedio de los factores, así que rara vez vas a tener un año excepcional pero tampoco uno desastroso.',
+        example:
+          'PAMP rankea 3/20 en momentum (muy top, normalizado a 0.10), 12/20 en low-vol (medio, 0.58), 5/20 en value (top, 0.21). Score combinado = (0.10 + 0.58 + 0.21) / 3 = 0.30 → ranking sólido, entra en top decile → LONG. Una acción que sea top-momentum pero bottom-value y bottom-vol probablemente termine en el medio del ranking combinado y no opera.',
       },
       {
         id: 'pairs',
         label: 'Pairs Trading',
-        paperRef: 'paper #8',
+        paperRef: 'Estrategia #8',
         what:
-          'Dos tickers correlacionados deberían moverse en línea. Cuando uno sobrerinde respecto al promedio del par, está "rico" — se va SHORT; el otro está "barato" — se va LONG. Dollar-neutral.',
+          'Estrategia market-neutral: dos tickers altamente correlacionados (ej. dos bancos del mismo país, o un ETF y su sector subyacente) deberían moverse en línea en el largo plazo. Cuando uno sobre-rinde respecto al promedio del par, se considera "rich" → SHORT; el otro está "cheap" → LONG. La diferencia se llama "spread" — se apuesta a que el spread reverte a su media histórica.',
         formula: [
           'log_ret_i,t = log(P_i,t / P_i,t−1)',
           'demeaned_i  = log_ret_i,t − mean(log_ret par, t)',
@@ -176,14 +194,16 @@ const SECTIONS = [
           'score_i < 0  →   LONG  i   (underperformed → expected revert up)',
         ],
         interpret:
-          'Market-neutral si los pesos están normalizados. Funciona mejor con pares del mismo sector / muy correlacionados. Riesgo: el spread puede divergir indefinidamente si los fundamentos cambian.',
+          'La fortaleza es la dollar-neutralidad: la posición es indiferente al mercado general. Si las dos acciones bajan 10% juntas, no perdés (vas long en una, short en la otra). El riesgo es divergencia fundamental: si una empresa anuncia un escándalo o un earnings desastroso, el spread puede agrandarse en lugar de reverter. Funciona mejor con pares de correlation > 0.7 y de la misma industria.',
+        example:
+          'GGAL.BA y BMA.BA (dos bancos argentinos altamente correlacionados, ρ ≈ 0.85). En los últimos 60 días, GGAL +12% y BMA +6%. Promedio del par = +9%. GGAL está "rich" (+12% − 9% = +3% sobre el par) → SHORT. BMA está "cheap" (−3%) → LONG. Posición dollar-neutral: $5,000 long en BMA, $5,000 short en GGAL. Profit si el spread se cierra (sea porque GGAL baja, BMA sube, o ambos convergen).',
       },
       {
         id: 'mean_reversion',
         label: 'Mean Reversion',
-        paperRef: 'paper #9 / #10',
+        paperRef: 'Estrategia #9 / #10',
         what:
-          'Generalización de pairs a N tickers. Calcula el retorno medio del cluster, identifica overperformers y underperformers, y apuesta a que reviertan hacia la media. Con "use clusters" toggle, agrupa por sector (paper #10) en vez de un único cluster (paper #9).',
+          'Generaliza el pairs trading a N tickers de un mismo cluster (sector, región, o "todos juntos"). Calcula el retorno medio del cluster sobre la ventana, identifica los outperformers y underperformers, y apuesta a que reviertan hacia la media. Los outperformers se shortean (estaban "rich"), los underperformers se longean (estaban "cheap"). Toggle "use clusters" agrupa por sector según tickers_meta.json (Estrategia #10); si no, usa un único cluster con todos (Estrategia #9).',
         formula: [
           'Para cada cluster C:',
           '  cluster_mean_t = mean(log_ret_i,t)   para i ∈ C',
@@ -194,7 +214,9 @@ const SECTIONS = [
           'score_i < 0  →   LONG  i',
         ],
         interpret:
-          'Más robusto que pairs por la diversificación. Clusters por sector reducen ruido idiosincrático. Performa mejor en horizontes cortos (días-semanas). Sufre cuando un ticker tiene noticia idiosincrática persistente.',
+          'Más robusto que pairs por la diversificación: una sola acción con noticia idiosincrática (M&A, escándalo) no rompe la estrategia porque está promediada con 5+ otras. Clusters por sector reducen ruido entre industrias no relacionadas. Performa mejor en horizontes cortos (días-semanas) donde la reversion es más probable. Sufre cuando un ticker tiene drift fundamental persistente — no toda divergencia revierte.',
+        example:
+          'Cluster "Bancos Argentinos" = [GGAL, BMA, BBAR, SUPV]. Retornos últimos 30 días: GGAL +15%, BMA +5%, BBAR +3%, SUPV -2%. Media del cluster = +5.25%. Demeaned: GGAL +9.75% (rich → SHORT), BMA -0.25% (≈ media → HOLD), BBAR -2.25% (LONG), SUPV -7.25% (LONG fuerte). Repartís $10,000 según pesos proporcionales a |demeaned|. Si la rotación entre los 4 bancos se reequilibra el próximo mes, ganás sin importar lo que haga el Merval entero.',
       },
     ],
   },
@@ -204,9 +226,9 @@ const SECTIONS = [
       {
         id: 'portfolio',
         label: 'Sharpe-Max Optimizer',
-        paperRef: 'paper #18',
+        paperRef: 'Estrategia #18',
         what:
-          'Dado un set de tickers, encuentra los pesos que maximizan el ratio de Sharpe del portfolio (retorno esperado por unidad de riesgo). Opcionalmente con shortselling o long-only.',
+          'Dado un universo de tickers, encuentra los pesos que maximizan el ratio de Sharpe del portfolio (retorno esperado por unidad de riesgo). Usa la matriz de covarianza de los retornos diarios y la solución analítica de Markowitz. Opcionalmente con shortselling (dollar-neutral, Σw_i = 0) o long-only (w_i ≥ 0).',
         formula: [
           'maximize  Sharpe(w) = (wᵀμ − r_f) / √(wᵀΣw)',
           'subject to  Σ w_i = 1',
@@ -217,7 +239,9 @@ const SECTIONS = [
           'r_f = risk-free rate (default 0)',
         ],
         interpret:
-          'Markowitz frontier en el punto tangente. Sensible a errores en μ — pequeños cambios en retornos esperados pueden volcar el portfolio. En la práctica se combina con shrinkage o constraints. Útil como baseline para comparar contra equal-weight.',
+          'Es el punto tangente de la frontera eficiente de Markowitz — teóricamente óptimo. Pero es extremadamente sensible a errores en los retornos esperados (μ): pequeños cambios en las estimaciones pueden hacer flip-flop los pesos del portfolio entre meses. En la práctica institucional se combina con técnicas de shrinkage (Ledoit-Wolf) o restricciones de turnover. Lo usamos como baseline para comparar contra portfolios naïve (equal-weight, market-cap weighted).',
+        example:
+          'Universo = [YPF, GGAL, PAMP, KO_CEDEAR, AAPL_CEDEAR]. Lookback 60 días: retornos medios anualizados [0.18, 0.22, 0.15, 0.08, 0.30] y covarianza estimada de la matriz de retornos diarios. La optimización long-only devuelve pesos {YPF: 0.10, GGAL: 0.25, PAMP: 0.15, KO: 0.20, AAPL: 0.30}. Sharpe portfolio = 1.45 (vs 0.95 si todos equal-weight). Para un total_investment de $100k → $30k en AAPL, $25k en GGAL, etc.',
       },
     ],
   },
@@ -408,6 +432,13 @@ export default function StrategyManual({ open, onClose }) {
                   <div className={styles.blockLbl}>CÓMO INTERPRETAR</div>
                   <p className={styles.prose}>{it.interpret}</p>
                 </div>
+
+                {it.example && (
+                  <div className={styles.block}>
+                    <div className={styles.blockLbl}>EJEMPLO APLICADO</div>
+                    <p className={styles.prose}>{it.example}</p>
+                  </div>
+                )}
               </section>
             ))}
           </article>
