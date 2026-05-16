@@ -40,7 +40,7 @@ export default function ConsensusRail({ ticker, signals, consensus, loading, onS
       <div className={styles.rows}>
         {strats.length === 0 && (
           <div className={styles.empty}>
-            sin estrategias activas — abrí ⚙ para habilitar
+            SIN ESTRATEGIAS ACTIVAS — ABRÍ ⚙ PARA HABILITAR
           </div>
         )}
         {strats.map((s) => (

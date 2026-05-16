@@ -36,14 +36,14 @@ export default function Dashboard() {
 
       <main className={styles.main}>
         {tickersLoading && (
-          <div className={styles.message}>cargando tickers…</div>
+          <div className={styles.message}>CARGANDO TICKERS…</div>
         )}
         {tickersError && (
-          <div className={styles.error}>error cargando tickers: {String(tickersError.message)}</div>
+          <div className={styles.error}>ERROR CARGANDO TICKERS: {String(tickersError.message)}</div>
         )}
         {tickers?.length === 0 && !tickersLoading && (
           <div className={styles.message}>
-            sin tickers configurados — agregá <code>SHEET_IDS_JSON</code> en el backend
+            SIN TICKERS CONFIGURADOS — AGREGÁ <code>SHEET_IDS_JSON</code> EN EL BACKEND
           </div>
         )}
 
