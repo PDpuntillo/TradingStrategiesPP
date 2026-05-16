@@ -87,7 +87,7 @@ export default function LaneConfigPanel({
 
         <div className={styles.list}>
           {rows.length === 0 && (
-            <div className={styles.empty}>sin tickers configurados</div>
+            <div className={styles.empty}>SIN TICKERS CONFIGURADOS</div>
           )}
           {rows.map(({ ticker, idx, info, visible }) => {
             const isDragging = draggedTicker === ticker

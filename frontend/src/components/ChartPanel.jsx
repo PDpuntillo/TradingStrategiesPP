@@ -109,10 +109,10 @@ export default function ChartPanel({ data, signals, loading }) {
   const pivot = signals?.strategy_14
 
   if (loading) {
-    return <div className={styles.empty}>cargando precios…</div>
+    return <div className={styles.empty}>CARGANDO PRECIOS…</div>
   }
   if (!data?.bars?.length) {
-    return <div className={styles.empty}>sin datos</div>
+    return <div className={styles.empty}>SIN DATOS</div>
   }
 
   return (

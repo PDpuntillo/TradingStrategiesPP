@@ -96,7 +96,7 @@ export default function TickerPicker({ open, onClose, allTickers, selected, onCh
             )
           })}
           {filtered.length === 0 && (
-            <div className={styles.empty}>sin matches para "{query}"</div>
+            <div className={styles.empty}>SIN MATCHES PARA "{query}"</div>
           )}
         </div>
 

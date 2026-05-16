@@ -103,7 +103,7 @@ export default function StrategySelector({ open, strategyNum, ticker, onClose })
           <div className={styles.formHead}>PARÁMETROS</div>
 
           {defs.length === 0 && (
-            <div className={styles.noParams}>Esta estrategia no acepta parámetros.</div>
+            <div className={styles.noParams}>ESTA ESTRATEGIA NO ACEPTA PARÁMETROS.</div>
           )}
 
           {defs.map((d) => {
