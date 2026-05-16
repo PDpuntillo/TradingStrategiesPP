@@ -1,7 +1,7 @@
 /*
  * LaneConfigPanel — drawer page-level que slidea desde arriba.
- * Full width, altura compacta (550px max o auto), debajo del sticky
- * header. Mantiene el overlay porque es config global.
+ * Full width, altura compacta (75vh max), debajo del sticky header.
+ * Mantiene el overlay porque es config global.
  */
 .overlay {
   position: fixed;
@@ -14,7 +14,7 @@
 
 .panel {
   position: fixed;
-  top: 0;                     /* slides down from off-screen, settles at 0 */
+  top: 0;
   left: 0;
   right: 0;
   max-height: 75vh;
@@ -26,11 +26,9 @@
   flex-direction: column;
   z-index: 56;
   animation: drawer-slide-down var(--anim-drawer) var(--ease-out-back);
-  /* Si se quiere que aparezca debajo del sticky header (56px), descomentar:
-     top: 56px;
-     pero el slide desde más arriba es más expresivo */
 }
 
+/* ===== Header ===== */
 .head {
   display: flex;
   justify-content: space-between;
@@ -70,12 +68,86 @@
   color: var(--accent-blue);
 }
 
-.bulkBar {
+/* ===== Toolbar: search + bulk actions ===== */
+.toolbar {
   display: flex;
-  gap: var(--s-2);
+  align-items: center;
+  gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
   background: var(--bg-card-soft);
   border-bottom: 1px solid var(--border-soft);
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--s-2);
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+
+.search {
+  width: 100%;
+  padding: var(--s-1) var(--s-5) var(--s-1) calc(var(--s-2) * 2 + 14px);
+  font-size: var(--fs-xs);
+  color: var(--fg-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 3px rgba(59, 125, 216, 0.18);
+}
+
+.search::placeholder {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+/* Cancela el botón nativo X del input type=search */
+.search::-webkit-search-cancel-button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.searchClear {
+  position: absolute;
+  right: var(--s-2);
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg-muted);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.searchClear:hover {
+  background: var(--fg-tertiary);
+}
+
+.bulkBar {
+  display: flex;
+  gap: var(--s-2);
+  flex-shrink: 0;
 }
 
 .bulkBtn {
@@ -94,6 +166,27 @@
 .bulkBtn:hover { filter: brightness(1.04); }
 .bulkBtn:active { box-shadow: var(--shadow-aqua-btn-active); }
 
+/* ===== Column header row (TICKER / NOMBRE / SECTOR) ===== */
+.colHead {
+  display: grid;
+  grid-template-columns: 24px 28px 70px minmax(160px, 1.4fr) minmax(120px, 1fr);
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-1) var(--s-4);
+  background: var(--bg-card-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.colLbl {
+  font-size: var(--fs-micro);
+  color: var(--fg-tertiary);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-weight: var(--weight-bold);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ===== List ===== */
 .list {
   flex: 1;
   display: flex;
@@ -112,7 +205,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 24px 24px 70px 1fr auto;
+  grid-template-columns: 24px 28px 70px minmax(160px, 1.4fr) minmax(120px, 1fr);
   align-items: center;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
@@ -147,16 +240,70 @@
   cursor: grabbing;
 }
 
-.check {
-  color: var(--fg-tertiary);
-  font-size: var(--fs-md);
-  text-align: center;
-  padding: 0;
-  font-weight: var(--weight-bold);
+.handleDisabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
-.check[aria-checked="true"] {
+/* Eye toggle — mismo affordance que el del ConsensusRail: marco siempre
+   visible para que se lea como botón, gradient aqua cuando activo. */
+.eyeBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  color: var(--fg-tertiary);
+  border-radius: var(--r-sm);
+  box-shadow:
+    inset 0 0 0 1px var(--border-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 1px 1px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition:
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.eyeBtn:hover {
   color: var(--accent-blue);
+  background: rgba(59, 125, 216, 0.12);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-blue),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 1px 3px rgba(59, 125, 216, 0.25);
+}
+
+.eyeBtn:active {
+  transform: scale(0.92);
+}
+
+.eyeBtn:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 1px;
+}
+
+.eyeBtnActive {
+  color: white;
+  background: var(--grad-aqua-blue);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(59, 125, 216, 0.45);
+}
+
+.eyeBtnActive:hover {
+  color: white;
+  background: var(--grad-aqua-blue-active);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 4px rgba(59, 125, 216, 0.55);
 }
 
 .ticker {
@@ -176,11 +323,15 @@
 
 .sector {
   font-size: var(--fs-micro);
-  color: var(--fg-muted);
+  color: var(--fg-tertiary);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* ===== Footer ===== */
 .foot {
   padding: var(--s-2) var(--s-4);
   border-top: 1px solid var(--border-soft);

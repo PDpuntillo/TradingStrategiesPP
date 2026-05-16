@@ -15,7 +15,12 @@ import {
 } from 'recharts'
 import AmberReadout from './AmberReadout'
 import { fmt } from '../lib/format'
+import { useChartOverlays } from '../hooks/useChartOverlays'
+import { useStrategyParams, STRATEGY_DEFAULTS } from '../hooks/useStrategyParams'
 import styles from './ChartPanel.module.css'
+
+// EMA con lambda decay (eq. 320 del paper, mirror del backend strategy_service.py)
+const EMA_LAMBDA = 0.94
 
 // Períodos de visualización (en barras de trading, ~252 por año).
 const PERIODS = [
@@ -28,45 +33,102 @@ const PERIODS = [
 ]
 
 /*
- * ChartPanel — velas OHLC + MAs + Pivot/Donchian.
+ * ChartPanel — velas OHLC + overlays per-estrategia opcionales.
  *
- * Las velas se dibujan con un Bar de Recharts + custom shape que renderea
- * SVG (rect body + line wick), sin depender de librerías externas.
+ * Las velas se dibujan con un Bar de Recharts + custom shape SVG (rect body
+ * + line wick). Los overlays (líneas de MAs, canal Donchian, levels de
+ * pivot) se computan client-side a partir de los params LIVE de cada
+ * estrategia (useStrategyParams) y se muestran/ocultan según
+ * useChartOverlays — el toggle es el botón con forma de ojo en cada row
+ * del rail.
  *
  * Pasamos la SERIE COMPLETA al ComposedChart y controlamos el viewport
  * con <Brush>. Los botones de período son presets que setean la ventana;
  * después el usuario puede arrastrar el brush para pan/resize manual.
  */
-export default function ChartPanel({ data, signals, loading }) {
+export default function ChartPanel({ ticker, data, signals, loading }) {
   const [period, setPeriod] = useState('6M')
   const [scale, setScale] = useState('linear')
 
-  // Serie completa con O/H/L/C + MAs
+  const { overlays } = useChartOverlays(ticker)
+  const [p11] = useStrategyParams(ticker, 11)
+  const [p12] = useStrategyParams(ticker, 12)
+  const [p13] = useStrategyParams(ticker, 13)
+  const [p15] = useStrategyParams(ticker, 15)
+
+  // Serie completa con O/H/L/C + columnas de overlays por estrategia.
+  // Computamos todas las columnas siempre (es barato) y luego renderizamos
+  // condicionalmente las Lines según el set de overlays activos.
   const series = useMemo(() => {
     if (!data?.bars) return []
     const closes = data.bars.map((b) => b.close)
-    const ma = (mp) => (idx) => {
-      if (idx < mp - 1) return null
+
+    const sma = (period) => (idx) => {
+      if (period < 1 || idx < period - 1) return null
       let s = 0
-      for (let i = idx - mp + 1; i <= idx; i++) s += closes[i]
-      return s / mp
+      for (let i = idx - period + 1; i <= idx; i++) s += closes[i]
+      return s / period
     }
-    const ma1 = ma(10)
-    const ma2 = ma(20)
-    const ma3 = ma(50)
+    // EMA del paper: weighted average over una ventana, NO recursivo
+    const ema = (period, lambda) => (idx) => {
+      if (period < 1 || idx < period - 1) return null
+      let num = 0
+      let denom = 0
+      for (let t = 0; t < period; t++) {
+        const p = closes[idx - t]
+        const w = Math.pow(lambda, t)
+        num += w * p
+        denom += w
+      }
+      return num / denom
+    }
+    const maOf = (period, type) =>
+      type === 'EMA' ? ema(period, EMA_LAMBDA) : sma(period)
+
+    // Donchian: max/min sobre los `period` bars ANTES del actual (mirror backend)
+    const rollMaxClose = (period) => (idx) => {
+      if (period < 1 || idx < period) return null
+      let m = -Infinity
+      for (let i = idx - period; i < idx; i++) m = Math.max(m, closes[i])
+      return m
+    }
+    const rollMinClose = (period) => (idx) => {
+      if (period < 1 || idx < period) return null
+      let m = Infinity
+      for (let i = idx - period; i < idx; i++) m = Math.min(m, closes[i])
+      return m
+    }
+
+    const d11 = STRATEGY_DEFAULTS[11]
+    const d12 = STRATEGY_DEFAULTS[12]
+    const d13 = STRATEGY_DEFAULTS[13]
+    const d15 = STRATEGY_DEFAULTS[15]
+    const s11 = maOf(p11.ma_period ?? d11.ma_period, p11.ma_type ?? d11.ma_type)
+    const s12Fast = sma(p12.ma_short_period ?? d12.ma_short_period)
+    const s12Slow = sma(p12.ma_long_period ?? d12.ma_long_period)
+    const s13Fast = sma(p13.ma1_period ?? d13.ma1_period)
+    const s13Mid = sma(p13.ma2_period ?? d13.ma2_period)
+    const s13Slow = sma(p13.ma3_period ?? d13.ma3_period)
+    const s15Up = rollMaxClose(p15.channel_period ?? d15.channel_period)
+    const s15Dn = rollMinClose(p15.channel_period ?? d15.channel_period)
+
     return data.bars.map((b, i) => ({
       ts: b.timestamp,
       open: b.open,
       high: b.high,
       low: b.low,
       close: b.close,
-      // dataKey para el Bar de velas: [low, high] = rango total del candle
       hl: [b.low, b.high],
-      MA10: ma1(i),
-      MA20: ma2(i),
-      MA50: ma3(i),
+      s11_ma: s11(i),
+      s12_fast: s12Fast(i),
+      s12_slow: s12Slow(i),
+      s13_fast: s13Fast(i),
+      s13_mid: s13Mid(i),
+      s13_slow: s13Slow(i),
+      s15_upper: s15Up(i),
+      s15_lower: s15Dn(i),
     }))
-  }, [data])
+  }, [data, p11, p12, p13, p15])
 
   const [window, setWindow] = useState({ start: 0, end: 0 })
 
@@ -83,17 +145,37 @@ export default function ChartPanel({ data, signals, loading }) {
     return series.slice(window.start, window.end + 1)
   }, [series, window])
 
-  // YAxis domain: usar high/low (no close) para que las wicks de las
-  // velas entren bien
+  const pivot = signals?.strategy_14
+
+  // YAxis domain: usar high/low (no close) para que las wicks entren bien,
+  // y sumar los valores de los overlays VISIBLES para que las líneas no se
+  // salgan del canvas cuando estén lejos del precio.
   const yDomain = useMemo(() => {
     if (!visibleSlice.length) return ['auto', 'auto']
     const vals = []
+    const show = (n) => overlays.has(n)
     for (const r of visibleSlice) {
       if (r.high != null) vals.push(r.high)
       if (r.low != null) vals.push(r.low)
-      if (r.MA10 != null) vals.push(r.MA10)
-      if (r.MA20 != null) vals.push(r.MA20)
-      if (r.MA50 != null) vals.push(r.MA50)
+      if (show(11) && r.s11_ma != null) vals.push(r.s11_ma)
+      if (show(12)) {
+        if (r.s12_fast != null) vals.push(r.s12_fast)
+        if (r.s12_slow != null) vals.push(r.s12_slow)
+      }
+      if (show(13)) {
+        if (r.s13_fast != null) vals.push(r.s13_fast)
+        if (r.s13_mid != null) vals.push(r.s13_mid)
+        if (r.s13_slow != null) vals.push(r.s13_slow)
+      }
+      if (show(15)) {
+        if (r.s15_upper != null) vals.push(r.s15_upper)
+        if (r.s15_lower != null) vals.push(r.s15_lower)
+      }
+    }
+    if (show(14) && pivot) {
+      if (pivot.resistance != null) vals.push(pivot.resistance)
+      if (pivot.pivot != null) vals.push(pivot.pivot)
+      if (pivot.support != null) vals.push(pivot.support)
     }
     if (!vals.length) return ['auto', 'auto']
     const min = Math.min(...vals)
@@ -103,10 +185,7 @@ export default function ChartPanel({ data, signals, loading }) {
       return [Math.max(min - pad, min * 0.97), max + pad]
     }
     return [min - pad, max + pad]
-  }, [visibleSlice, scale])
-
-  const channel = signals?.strategy_15
-  const pivot = signals?.strategy_14
+  }, [visibleSlice, scale, overlays, pivot])
 
   if (loading) {
     return <div className={styles.empty}>CARGANDO PRECIOS…</div>
@@ -176,18 +255,12 @@ export default function ChartPanel({ data, signals, loading }) {
             cursor={{ stroke: 'var(--accent-blue)', strokeOpacity: 0.5, strokeWidth: 1 }}
           />
 
-          {pivot && (
+          {/* S14 — Pivot levels (horizontales, computados del bar previo) */}
+          {overlays.has(14) && pivot && (
             <>
               <ReferenceLine y={pivot.resistance} stroke="var(--sig-short)" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: 'R', position: 'left', fill: 'var(--sig-short)', fontSize: 11, fontWeight: 700 }} />
               <ReferenceLine y={pivot.pivot} stroke="var(--overlay-pivot)" strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: 'P', position: 'left', fill: 'var(--overlay-pivot)', fontSize: 11, fontWeight: 700 }} />
               <ReferenceLine y={pivot.support} stroke="var(--sig-long)" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: 'S', position: 'left', fill: 'var(--sig-long)', fontSize: 11, fontWeight: 700 }} />
-            </>
-          )}
-
-          {channel && (
-            <>
-              <ReferenceLine y={channel.band_upper} stroke="var(--overlay-donchian)" strokeOpacity={0.5} strokeDasharray="6 3" />
-              <ReferenceLine y={channel.band_lower} stroke="var(--overlay-donchian)" strokeOpacity={0.5} strokeDasharray="6 3" />
             </>
           )}
 
@@ -201,9 +274,109 @@ export default function ChartPanel({ data, signals, loading }) {
             legendType="none"
           />
 
-          <Line type="monotone" dataKey="MA10" stroke="var(--overlay-cyan)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="MA20" stroke="var(--overlay-blue)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
-          <Line type="monotone" dataKey="MA50" stroke="var(--overlay-violet)" strokeWidth={1.25} dot={false} isAnimationActive={false} />
+          {/* S11 — Single MA (SMA o EMA según ma_type del drawer) */}
+          {overlays.has(11) && (
+            <Line
+              type="monotone"
+              dataKey="s11_ma"
+              name={`S11 ${p11.ma_type ?? 'SMA'}(${p11.ma_period ?? 20})`}
+              stroke="var(--overlay-s11)"
+              strokeWidth={1.4}
+              dot={false}
+              isAnimationActive={false}
+              connectNulls
+            />
+          )}
+
+          {/* S12 — Dual MA (fast + slow) */}
+          {overlays.has(12) && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="s12_fast"
+                name={`S12 fast(${p12.ma_short_period ?? 10})`}
+                stroke="var(--overlay-s12-fast)"
+                strokeWidth={1.4}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="s12_slow"
+                name={`S12 slow(${p12.ma_long_period ?? 30})`}
+                stroke="var(--overlay-s12-slow)"
+                strokeWidth={1.4}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            </>
+          )}
+
+          {/* S13 — Triple MA (fast + mid + slow) */}
+          {overlays.has(13) && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="s13_fast"
+                name={`S13 fast(${p13.ma1_period ?? 3})`}
+                stroke="var(--overlay-s13-fast)"
+                strokeWidth={1.25}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="s13_mid"
+                name={`S13 mid(${p13.ma2_period ?? 10})`}
+                stroke="var(--overlay-s13-mid)"
+                strokeWidth={1.25}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="s13_slow"
+                name={`S13 slow(${p13.ma3_period ?? 21})`}
+                stroke="var(--overlay-s13-slow)"
+                strokeWidth={1.25}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            </>
+          )}
+
+          {/* S15 — Donchian channel (rolling max/min de los últimos N closes) */}
+          {overlays.has(15) && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="s15_upper"
+                name={`S15 upper(${p15.channel_period ?? 20})`}
+                stroke="var(--overlay-donchian)"
+                strokeWidth={1.25}
+                strokeDasharray="6 3"
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+              <Line
+                type="monotone"
+                dataKey="s15_lower"
+                name={`S15 lower(${p15.channel_period ?? 20})`}
+                stroke="var(--overlay-donchian)"
+                strokeWidth={1.25}
+                strokeDasharray="6 3"
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+              />
+            </>
+          )}
 
           <Legend
             verticalAlign="top"
